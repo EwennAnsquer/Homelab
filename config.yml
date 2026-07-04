@@ -1,0 +1,47 @@
+proxmox:
+  ip: "192.168.1.100"
+  endpoint: "https://192.168.1.100:8006/"
+  node_name: "proxmox"
+  api_token: "root@pam!test-iac=6b31760c-b6b3-4c58-aae6-b7e68dfa68e1"
+  storage_pbs: "proxmox-backup-server-local"
+
+ansible:
+  ansible_user: "root"
+  ansible_ssh_private_key_file: "~/.ssh/id_25519_ansible"
+
+containers:
+  - vm_id: 901
+    hostname: "debian-13-vierge"
+    type: "debian"
+    cores: 1
+    dedicated_memory: 256
+    disk_size: 8
+    dns_server: "192.168.1.105"
+    template: "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+    tags: ["debian", "ansible", "iac", "ip dhcp"]
+    address: "dhcp"
+    servers: ["192.168.1.105"]
+    keys: [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILoOMCJMoxOqd2ZJ0Yux1+qXa9sDg4oJPmhojF90a/lV ansible" ] 
+    datastore_id: "local-lvm"
+    nesting: true
+    network_interface_name: "eth0"
+    network_interface_bridge: "vmbr0"
+
+  - vm_id: 902
+    hostname: "debian-13-vierge-2"
+    type: "debian"
+    cores: 1
+    dedicated_memory: 256
+    disk_size: 8
+    dns_server: "192.168.1.105"
+    template: "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+    tags: ["debian", "ansible", "iac", "ip dhcp", "test"]
+    address: "dhcp"
+    servers: ["192.168.1.105"]
+    keys: [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILoOMCJMoxOqd2ZJ0Yux1+qXa9sDg4oJPmhojF90a/lV ansible" ] 
+    datastore_id: "local-lvm"
+    nesting: true
+    network_interface_name: "eth0"
+    network_interface_bridge: "vmbr0"
+
+# virtual-machines:

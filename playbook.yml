@@ -1,0 +1,168 @@
+# ==============================================================================
+# BLOC 1 : Gestion de la Restauration (S'exécute sur le serveur Proxmox)
+# ==============================================================================
+- name: "Vérification et Restauration Proxmox"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - config.yml
+
+  tasks:
+    # 1. ON RÉCUPÈRE LA LISTE BRUTE DES SAUVEGARDES DEPUIS PROXMOX
+    - name: "Proxmox : Lister les sauvegardes disponibles pour chaque CT"
+      ansible.builtin.command: "pvesm list proxmox-backup-server-local --vmid {{ item.vm_id }}"
+      register: pbs_backups_list
+      delegate_to: "{{ proxmox.ip }}"
+      loop: "{{ containers }}"
+      failed_when: false
+      changed_when: false
+      vars:
+        ansible_user: "{{ ansible.ansible_user }}"
+        ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
+
+    # 2. ACTION : RESTAURER CHAQUE CONTENEUR S'IL Y A UNE BACKUP DISPONIBLE
+    - name: "Proxmox : Restaurer la version la plus récente pour chaque CT"
+      ansible.builtin.command: >
+        pct restore {{ item.item.vm_id }} 
+        {{ (item.stdout_lines | reverse | select('search', 'ct/' ~ item.item.vm_id) | first | default(' ')).split()[0] }} 
+        --force 1 
+        --storage local-lvm
+      delegate_to: "{{ proxmox.ip }}"
+      loop: "{{ pbs_backups_list.results }}"
+      # On n'exécute la restauration que si une ligne de backup valide a été trouvée pour ce conteneur
+      when: 
+        - item.stdout_lines is defined 
+        - item.stdout_lines | select('search', 'ct/' ~ item.item.vm_id) | list | length > 0
+      vars:
+        ansible_user: "{{ ansible.ansible_user }}"
+        ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
+
+    # 3. ACTION : DÉMARRER TOUS LES CONTENEURS
+    - name: "Proxmox : Démarrer tous les conteneurs"
+      ansible.builtin.command: "pct start {{ item.vm_id }}"
+      delegate_to: "{{ proxmox.ip }}"
+      loop: "{{ containers }}"
+      vars:
+        ansible_user: "{{ ansible.ansible_user }}"
+        ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
+
+    - name: "Python : Découverte globale des IPs DHCP"
+      ansible.builtin.command: "python3 get_lxc_ip.py"
+      delegate_to: localhost
+
+    - name: "Ansible : Recharger le nouvel inventaire complet"
+      ansible.builtin.meta: refresh_inventory
+
+# ==============================================================================
+# BLOC 2 : Configuration Interne (S'exécute sur le conteneur Debian)
+# ==============================================================================
+- name: "Configuration initiale du conteneur Debian 13"
+  hosts: all
+  gather_facts: true
+  vars_files:
+    - config.yml
+
+  pre_tasks:
+    # 🟢 SÉCURITÉ DYNAMIQUE : On extrait la configuration du conteneur en cours d'exécution
+    - name: "Récupérer la configuration du conteneur courant"
+      ansible.builtin.set_fact:
+        current_ct: "{{ containers | selectattr('hostname', 'equalto', ansible_facts['hostname']) | first }}"
+
+  tasks:
+
+    - name: "Configurer le fuseau horaire sur Europe/Paris"
+      community.general.timezone:
+        name: Europe/Paris
+
+    - name: "Mettre à jour les dépôts APT et patcher le système"
+      ansible.builtin.apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: "Installer les outils de base indispensables"
+      ansible.builtin.apt:
+        name:
+          - curl
+          - htop
+          - git
+        state: present
+
+    - name: "Nettoyer les paquets APT inutilisés (Autoremove & Autoclean)"
+      ansible.builtin.apt:
+        autoremove: yes
+        autoclean: yes
+
+    # 1. RÉCUPÉRATION DES RÈGLES EXISTANTES ADGUARD
+    - name: "AdGuard : Récupérer la liste des réécritures DNS existantes"
+      ansible.builtin.uri:
+        url: "http://{{ current_ct.dns_server }}:80/control/rewrite/list"
+        method: GET
+        user: "root"
+        password: "adguard_pour_avoir_mon_dns"
+        force_basic_auth: yes
+        status_code: 200
+      register: adguard_rewrites
+      delegate_to: localhost
+
+    # 2. ANALYSE ET RECHERCHE D'UNE ANCIENNE IP
+    - name: "AdGuard : Vérifier si le domaine existe avec une MAUVAISE adresse IP"
+      ansible.builtin.set_fact:
+        dns_needs_update: "{{ item.answer != ansible_facts['default_ipv4']['address'] }}"
+      loop: "{{ adguard_rewrites.json }}"
+      when: item.domain == (ansible_facts['hostname'] ~ '.home')
+      delegate_to: localhost
+
+    # 3. ANALYSE POUR RECHERCHER SI LA RÈGLE EST DÉJÀ PARFAITE
+    - name: "AdGuard : Vérifier si la règle existe déjà avec la BONNE adresse IP"
+      ansible.builtin.set_fact:
+        dns_already_correct: true
+      loop: "{{ adguard_rewrites.json }}"
+      when: item.domain == (ansible_facts['hostname'] ~ '.home') and item.answer == ansible_facts['default_ipv4']['address']
+      delegate_to: localhost
+
+    # 4. ACTION : SUPPRESSION DE L'ANCIENNE RÈGLE (Si mauvaise IP)
+    - name: "AdGuard : Supprimer l'ancienne réécriture DNS (IP obsolète)"
+      ansible.builtin.uri:
+        url: "http://{{ current_ct.dns_server }}:80/control/rewrite/delete"
+        method: POST
+        user: "root"
+        password: "adguard_pour_avoir_mon_dns"
+        force_basic_auth: yes
+        status_code: [200, 201]
+        body_format: json
+        body:
+          domain: "{{ ansible_facts['hostname'] }}.home"
+          answer: "{{ (adguard_rewrites.json | selectattr('domain', 'equalto', ansible_facts['hostname'] ~ '.home') | first).answer }}"
+      when: dns_needs_update is defined and dns_needs_update | bool
+      delegate_to: localhost
+
+    # 5. ACTION : CRÉATION DE LA NOUVELLE RÈGLE
+    - name: "AdGuard : Créer la réécriture DNS"
+      ansible.builtin.uri:
+        url: "http://{{ current_ct.dns_server }}:80/control/rewrite/add"
+        method: POST
+        user: "root"
+        password: "adguard_pour_avoir_mon_dns"
+        force_basic_auth: yes
+        status_code: [200, 201]
+        body_format: json
+        body:
+          domain: "{{ ansible_facts['hostname'] }}.home"
+          answer: "{{ ansible_facts['default_ipv4']['address'] }}"
+      when: dns_already_correct is not defined and (dns_needs_update is not defined or dns_needs_update | bool)
+      delegate_to: localhost
+
+    - name: "Activer les alias de base (.bashrc)"
+      ansible.builtin.lineinfile:
+        path: /root/.bashrc
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+      loop:
+        - { regexp: "^#?alias ll=", line: "alias ll='ls -alF'" }
+        - { regexp: "^#?alias la=", line: "alias la='ls -A'" }
+
+  handlers:
+    - name: "Redémarrer SSH"
+      ansible.builtin.systemd:
+        name: ssh
+        state: restarted

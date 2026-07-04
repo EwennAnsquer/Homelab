@@ -1,0 +1,31 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+terraform.tfstate*
+# Lock file: keep it under version control (do NOT ignore .terraform.lock.hcl)
+# .terraform.lock.hcl
+
+# Terraform local CLI/credentials
+.terraformrc
+terraform.rc
+.terraform.d/
+
+# Sensitive local files and overrides (uncomment if you use them)
+# *.tfvars
+# *.tfvars.json
+# override.tf
+# override.tf.json
+
+# Common secrets / env
+*.key
+*.pem
+*.crt
+*.env
+*.secret
+
+# Editor / OS files
+.vscode/
+.DS_Store
+.idea/
+*.swp
