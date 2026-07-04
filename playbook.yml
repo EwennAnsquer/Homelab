@@ -63,7 +63,6 @@
     - config.yml
 
   pre_tasks:
-    # 🟢 SÉCURITÉ DYNAMIQUE : On extrait la configuration du conteneur en cours d'exécution
     - name: "Récupérer la configuration du conteneur courant"
       ansible.builtin.set_fact:
         current_ct: "{{ containers | selectattr('hostname', 'equalto', ansible_facts['hostname']) | first }}"
@@ -160,6 +159,10 @@
       loop:
         - { regexp: "^#?alias ll=", line: "alias ll='ls -alF'" }
         - { regexp: "^#?alias la=", line: "alias la='ls -A'" }
+
+  roles:
+  - role: grafana
+    when: "'grafana' in inventory_hostname"
 
   handlers:
     - name: "Redémarrer SSH"

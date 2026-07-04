@@ -78,7 +78,8 @@ resource "proxmox_virtual_environment_container" "container_debian_13" {
   }
 
   memory {
-    dedicated = each.value.dedicated_memory
+    dedicated = each.value.memory
+    swap = each.value.memory
   }
 
   disk {
