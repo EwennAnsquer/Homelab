@@ -29,3 +29,24 @@ terraform.rc
 .DS_Store
 .idea/
 *.swp
+
+# Fichiers de retry (générés automatiquement par Ansible en cas d'échec d'un playbook)
+*.retry
+
+# Rôles et collections externes téléchargés depuis Ansible Galaxy
+# (Optionnel : décommente si tu utilises un fichier requirements.yml pour télécharger des rôles tiers)
+# roles/externals/
+collections/
+
+# Fichiers de configuration locale d'Ansible (si tu crées un ansible.cfg spécifique)
+ansible.cfg
+
+# Fichiers de logs locaux
+ansible.log
+
+# Fichiers contenant des secrets chiffrés avec Ansible Vault (Optionnel)
+# Si tu crées un fichier de mot de passe en clair pour Vault, ne le push JAMAIS
+.vault_pass
+vault_password.txt
+
+hosts.yml
