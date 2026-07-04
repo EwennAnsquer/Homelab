@@ -1,0 +1,46 @@
+---
+# tasks file for roles/grafana
+
+- name: Installer les prérequis (curl et apt-transport-https)
+  apt:
+    name:
+      - apt-transport-https
+      - curl
+    state: present
+    update_cache: yes
+
+- name: Créer le dossier pour les clés GPG si inexistant
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Ajouter le dépôt stable officiel de Grafana (Format DEB822 moderne)
+  ansible.builtin.deb822_repository:
+    name: grafana
+    state: present
+    types: [deb]
+    uris: "https://apt.grafana.com"
+    suites: [stable]
+    components: [main]
+    signed_by: "https://apt.grafana.com/gpg.key"
+
+- name: Installer le paquet Grafana-OSS
+  apt:
+    name: grafana
+    state: present
+    update_cache: yes
+
+- name: Générer le fichier de configuration Grafana (grafana.ini) depuis le template
+  template:
+    src: grafana.ini.j2            # Nom de ton fichier dans le dossier 'templates/'
+    dest: /etc/grafana/grafana.ini # Emplacement réel de la config sur la machine Debian
+    owner: root
+    group: grafana
+    mode: '0640'
+
+- name: S'assurer que le service Grafana est démarré et activé au boot
+  systemd:
+    name: grafana-server
+    state: started
+    enabled: yes
