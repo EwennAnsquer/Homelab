@@ -1,0 +1,96 @@
+---
+# tasks file for roles/common
+
+# 1. INITIALISATION DES VARIABLES GLOBALES
+- name: "Système : Récupérer la configuration du conteneur courant"
+  ansible.builtin.set_fact:
+    current_ct: "{{ containers | selectattr('hostname', 'equalto', ansible_facts['hostname']) | first }}"
+
+# 2. CONFIGURATION ET MISE À JOUR DE BASE
+- name: "Système : Configurer le fuseau horaire sur Europe/Paris"
+  community.general.timezone:
+    name: Europe/Paris
+
+- name: "Système : Mettre à jour les dépôts APT et patcher le système"
+  ansible.builtin.apt:
+    update_cache: yes
+    upgrade: dist
+
+- name: "Système : Installer les outils de base indispensables"
+  ansible.builtin.apt:
+    name:
+      - curl
+      - htop
+      - git
+    state: present
+
+- name: "Système : Nettoyer les paquets APT inutilisés (Autoremove & Autoclean)"
+  ansible.builtin.apt:
+    autoremove: yes
+    autoclean: yes
+
+# 3. GESTION AUTOMATIQUE DU DNS ADGUARD
+- name: "AdGuard : Récupérer la liste des réécritures DNS existantes"
+  ansible.builtin.uri:
+    url: "http://{{ current_ct.dns_server }}:80/control/rewrite/list"
+    method: GET
+    user: "root"
+    password: "adguard_pour_avoir_mon_dns"
+    force_basic_auth: yes
+    status_code: 200
+  register: adguard_rewrites
+  delegate_to: localhost
+
+- name: "AdGuard : Vérifier si le domaine existe avec une MAUVAISE adresse IP"
+  ansible.builtin.set_fact:
+    dns_needs_update: "{{ item.answer != ansible_facts['default_ipv4']['address'] }}"
+  loop: "{{ adguard_rewrites.json }}"
+  when: item.domain == (ansible_facts['hostname'] ~ '.home')
+  delegate_to: localhost
+
+- name: "AdGuard : Vérifier si la règle existe déjà avec la BONNE adresse IP"
+  ansible.builtin.set_fact:
+    dns_already_correct: true
+  loop: "{{ adguard_rewrites.json }}"
+  when: item.domain == (ansible_facts['hostname'] ~ '.home') and item.answer == ansible_facts['default_ipv4']['address']
+  delegate_to: localhost
+
+- name: "AdGuard : Supprimer l'ancienne réécriture DNS (IP obsolète)"
+  ansible.builtin.uri:
+    url: "http://{{ current_ct.dns_server }}:80/control/rewrite/delete"
+    method: POST
+    user: "root"
+    password: "adguard_pour_avoir_mon_dns"
+    force_basic_auth: yes
+    status_code: [200, 201]
+    body_format: json
+    body:
+      domain: "{{ ansible_facts['hostname'] }}.home"
+      answer: "{{ (adguard_rewrites.json | selectattr('domain', 'equalto', ansible_facts['hostname'] ~ '.home') | first).answer }}"
+  when: dns_needs_update is defined and dns_needs_update | bool
+  delegate_to: localhost
+
+- name: "AdGuard : Créer la réécriture DNS"
+  ansible.builtin.uri:
+    url: "http://{{ current_ct.dns_server }}:80/control/rewrite/add"
+    method: POST
+    user: "root"
+    password: "adguard_pour_avoir_mon_dns"
+    force_basic_auth: yes
+    status_code: [200, 201]
+    body_format: json
+    body:
+      domain: "{{ ansible_facts['hostname'] }}.home"
+      answer: "{{ ansible_facts['default_ipv4']['address'] }}"
+  when: dns_already_correct is not defined and (dns_needs_update is not defined or dns_needs_update | bool)
+  delegate_to: localhost
+
+# 4. PERSONNALISATION DU SHELL
+- name: "Système : Activer les alias de base (.bashrc)"
+  ansible.builtin.lineinfile:
+    path: /root/.bashrc
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  loop:
+    - { regexp: "^#?alias ll=", line: "alias ll='ls -alF'" }
+    - { regexp: "^#?alias la=", line: "alias la='ls -A'" }
