@@ -1,0 +1,47 @@
+---
+# tasks file for roles/proxmox_restore
+
+# 1. ON RÉCUPÈRE LA LISTE BRUTE DES SAUVEGARDES DEPUIS PROXMOX
+- name: "Proxmox : Lister les sauvegardes disponibles pour chaque CT"
+  ansible.builtin.command: "pvesm list proxmox-backup-server-local --vmid {{ item.vm_id }}"
+  register: pbs_backups_list
+  delegate_to: "{{ proxmox.ip }}"
+  loop: "{{ containers }}"
+  failed_when: false
+  changed_when: false
+  vars:
+    ansible_user: "{{ ansible.ansible_user }}"
+    ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
+
+# 2. ACTION : RESTAURER CHAQUE CONTENEUR S'IL Y A UNE BACKUP DISPONIBLE
+- name: "Proxmox : Restaurer la version la plus récente pour chaque CT"
+  ansible.builtin.command: >
+    pct restore {{ item.item.vm_id }} 
+    {{ (item.stdout_lines | reverse | select('search', 'ct/' ~ item.item.vm_id) | first | default(' ')).split()[0] }} 
+    --force 1 
+    --storage local-lvm
+  delegate_to: "{{ proxmox.ip }}"
+  loop: "{{ pbs_backups_list.results }}"
+  # On n'exécute la restauration que si une ligne de backup valide a été trouvée pour ce conteneur
+  when: 
+    - item.stdout_lines is defined 
+    - item.stdout_lines | select('search', 'ct/' ~ item.item.vm_id) | list | length > 0
+  vars:
+    ansible_user: "{{ ansible.ansible_user }}"
+    ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
+
+# 3. ACTION : DÉMARRER TOUS LES CONTENEURS
+- name: "Proxmox : Démarrer tous les conteneurs"
+  ansible.builtin.command: "pct start {{ item.vm_id }}"
+  delegate_to: "{{ proxmox.ip }}"
+  loop: "{{ containers }}"
+  vars:
+    ansible_user: "{{ ansible.ansible_user }}"
+    ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
+
+- name: "Python : Découverte globale des IPs DHCP"
+  ansible.builtin.command: "python3 get_lxc_ip.py"
+  delegate_to: localhost
+
+- name: "Ansible : Recharger le nouvel inventaire complet"
+  ansible.builtin.meta: refresh_inventory
