@@ -32,3 +32,14 @@
     - config.yml
   roles:
     - grafana
+
+# ==============================================================================
+# BLOC 4 : Déploiement de la base de données de métriques
+# ==============================================================================
+- name: "Déploiement de VictoriaMetrics"
+  hosts: victoria-metrics-test-iac
+  gather_facts: true
+  vars_files:
+    - config.yml
+  roles:
+    - victoria_metrics
