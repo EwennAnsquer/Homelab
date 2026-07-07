@@ -1,0 +1,13 @@
+[Unit]
+Description=VictoriaMetrics Time Series Database
+After=network.target
+
+[Service]
+Type=simple
+User=victoriametrics
+Group=victoriametrics
+ExecStart=/usr/local/bin/victoria-metrics-prod -promscrape.config=/etc/victoria-metrics/prometheus.yml -storageDataPath=/var/lib/victoria-metrics
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
