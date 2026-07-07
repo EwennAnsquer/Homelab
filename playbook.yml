@@ -26,7 +26,7 @@
 # ==============================================================================
 # BLOC 3 : Déploiement des Applications Spécifiques (Cible par hôte)
 # ==============================================================================
-- name: "Déploiement de la suite de monitoring"
+- name: "Déploiement de Grafana"
   hosts: grafana-test-iac
   vars_files:
     - config.yml
