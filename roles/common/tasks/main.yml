@@ -92,6 +92,17 @@
     state: started
     daemon_reload: yes
 
+- name: "DNS : Forcer l'utilisation d'AdGuard Home dans le resolv.conf"
+  ansible.builtin.copy:
+    dest: /etc/resolv.conf
+    owner: nobody
+    group: nogroup
+    mode: '0444' # 👈 Lecture seule pour absolument tout le monde
+    content: |
+      nameserver 192.168.1.105
+      search home
+  when: "'adguard' not in ansible_facts['hostname']"
+
 # 4. GESTION AUTOMATIQUE DU DNS ADGUARD
 - name: "AdGuard : Récupérer la liste des réécritures DNS existantes"
   ansible.builtin.uri:
