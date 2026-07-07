@@ -1,0 +1,7 @@
+---
+# handlers file for roles/common
+
+- name: "Restart Node Exporter"
+  ansible.builtin.systemd:
+    name: node_exporter
+    state: restarted
