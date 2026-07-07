@@ -29,7 +29,70 @@
     autoremove: yes
     autoclean: yes
 
-# 3. GESTION AUTOMATIQUE DU DNS ADGUARD
+# 3. INSTALLATION ET CONFIGURATION DE NODE EXPORTER
+- name: "Node Exporter : Créer le groupe système"
+  ansible.builtin.group:
+    name: node_exporter
+    system: yes
+    state: present
+
+- name: "Node Exporter : Créer l'utilisateur système"
+  ansible.builtin.user:
+    name: node_exporter
+    group: node_exporter
+    system: yes
+    shell: /usr/sbin/nologin
+    create_home: no
+    state: present
+
+- name: "Node Exporter : Télécharger et désarchiver le binaire officiel"
+  ansible.builtin.unarchive:
+    src: "https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-amd64.tar.gz"
+    dest: /tmp/
+    remote_src: yes
+    creates: /tmp/node_exporter-1.8.2.linux-amd64/node_exporter
+
+- name: "Node Exporter : Copier le binaire dans le dossier système"
+  ansible.builtin.copy:
+    src: /tmp/node_exporter-1.8.2.linux-amd64/node_exporter
+    dest: /usr/local/bin/node_exporter
+    remote_src: yes
+    owner: root
+    group: root
+    mode: '0755'
+  notify: "Restart Node Exporter"
+
+- name: "Node Exporter : Créer le fichier de service Systemd"
+  ansible.builtin.blockinfile:
+    path: /etc/systemd/system/node_exporter.service
+    create: yes
+    owner: root
+    group: root
+    mode: '0644'
+    block: |
+      [Unit]
+      Description=Node Exporter
+      After=network.target
+
+      [Service]
+      User=node_exporter
+      Group=node_exporter
+      Type=simple
+      ExecStart=/usr/local/bin/node_exporter
+      Restart=always
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: "Restart Node Exporter"
+
+- name: "Node Exporter : S'assurer que le service est démarré et activé"
+  ansible.builtin.systemd:
+    name: node_exporter
+    enabled: yes
+    state: started
+    daemon_reload: yes
+
+# 4. GESTION AUTOMATIQUE DU DNS ADGUARD
 - name: "AdGuard : Récupérer la liste des réécritures DNS existantes"
   ansible.builtin.uri:
     url: "http://{{ current_ct.dns_server }}:80/control/rewrite/list"
@@ -85,7 +148,7 @@
   when: dns_already_correct is not defined and (dns_needs_update is not defined or dns_needs_update | bool)
   delegate_to: localhost
 
-# 4. PERSONNALISATION DU SHELL
+# 5. PERSONNALISATION DU SHELL
 - name: "Système : Activer les alias de base (.bashrc)"
   ansible.builtin.lineinfile:
     path: /root/.bashrc
