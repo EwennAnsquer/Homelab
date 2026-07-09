@@ -76,7 +76,7 @@
   ansible.builtin.git:
     repo: "https://github.com/NginxProxyManager/nginx-proxy-manager.git"
     dest: "{{ npm_opt_dir }}"
-    version: "master"
+    version: "{{ npm_version }}"
     force: yes
 
 - name: "NPM : Créer l'ensemble des répertoires requis"
@@ -193,6 +193,7 @@
   ansible.builtin.shell: |
     rm -rf {{ npm_base_dir }}/config/default.json
     cd {{ npm_base_dir }}
+    sed -i 's/"version": "2.0.0"/"version": "2.15.1"/g' package.json 2>/dev/null || true
     yarn install --network-timeout 600000
   args:
     creates: "{{ npm_base_dir }}/node_modules/better-sqlite3"
