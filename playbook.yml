@@ -43,3 +43,14 @@
     - config.yml
   roles:
     - victoria_metrics
+
+# ==============================================================================
+# BLOC 5 : Déploiement de nginx proxy manager
+# ==============================================================================
+- name: "Déploiement de Nginx Proxy Manager"
+  hosts: nginx-proxy-manager-test-iac
+  gather_facts: true
+  vars_files:
+    - config.yml
+  roles:
+    - nginx_proxy_manager
