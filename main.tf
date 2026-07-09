@@ -63,7 +63,7 @@ resource "proxmox_virtual_environment_container" "container_debian_13" {
 
     dns {
       # Adresse IP de ton serveur AdGuard Home
-      servers = each.value.servers
+      servers = [each.value.dns_server]
     }
 
     user_account {

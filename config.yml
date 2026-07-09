@@ -20,7 +20,6 @@ containers:
     template: "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
     tags: ["debian", "ansible", "iac", "ip dhcp"]
     address: "dhcp"
-    servers: ["192.168.1.105"]
     keys: [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILoOMCJMoxOqd2ZJ0Yux1+qXa9sDg4oJPmhojF90a/lV ansible" ] 
     datastore_id: "local-lvm"
     nesting: true
@@ -37,7 +36,22 @@ containers:
     template: "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
     tags: ["debian", "ansible", "iac", "ip dhcp"]
     address: "dhcp"
-    servers: ["192.168.1.105"]
+    keys: [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILoOMCJMoxOqd2ZJ0Yux1+qXa9sDg4oJPmhojF90a/lV ansible" ] 
+    datastore_id: "local-lvm"
+    nesting: true
+    network_interface_name: "eth0"
+    network_interface_bridge: "vmbr0"
+
+  - vm_id: 903
+    hostname: "nginx-proxy-manager-test-iac"
+    type: "debian"
+    cores: 2
+    memory: 1024
+    disk_size: 8
+    dns_server: "192.168.1.105"
+    template: "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
+    tags: ["debian", "ansible", "iac", "ip dhcp"]
+    address: "dhcp"
     keys: [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILoOMCJMoxOqd2ZJ0Yux1+qXa9sDg4oJPmhojF90a/lV ansible" ] 
     datastore_id: "local-lvm"
     nesting: true

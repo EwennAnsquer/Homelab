@@ -1,0 +1,9 @@
+---
+# defaults file for roles/nginx_proxy_manager
+
+npm_node_version: "22"
+openresty_version: "1.29.2.5"
+
+# Chemins requis par l'écosystème NPM
+npm_opt_dir: "/opt/nginxproxymanager"
+npm_base_dir: "/app"
