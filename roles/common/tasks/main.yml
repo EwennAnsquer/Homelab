@@ -6,6 +6,35 @@
   ansible.builtin.set_fact:
     current_ct: "{{ containers | selectattr('hostname', 'equalto', ansible_facts['hostname']) | first }}"
 
+# Extraction de l'IP propre (sans le masque /24) du fichier config.yml
+- name: "Système : Extraire l'IP statique du conteneur"
+  ansible.builtin.set_fact:
+    static_ip: "{{ current_ct.address | split('/') | first }}"
+
+# 1.1 CONFIGURATION DES FEATURES PROXMOX À CHAUD
+- name: "Proxmox : Vérifier et activer keyctl si demandé dans config.yml"
+  block:
+    - name: "Proxmox : Récupérer la configuration actuelle des features du LXC"
+      ansible.builtin.command: "pct config {{ current_ct.vm_id }}"
+      register: lxc_config
+      changed_when: false
+      delegate_to: "{{ proxmox.ip }}"
+      vars:
+        ansible_user: "{{ ansible.ansible_user }}"
+
+    - name: "Proxmox : Activer keyctl sur le conteneur LXC"
+      ansible.builtin.command: "pct set {{ current_ct.vm_id }} --features nesting=1,keyctl=1"
+      register: keyctl_activation
+      # On ne lance la commande que si 'keyctl=1' n'est pas déjà présent dans la configuration du LXC
+      when: "'keyctl=1' not in lxc_config.stdout"
+      notify: "Redémarrer le conteneur LXC"
+      delegate_to: "{{ proxmox.ip }}"
+      vars:
+        ansible_user: "{{ ansible.ansible_user }}"
+
+  # Ce bloc entier ne s'exécute QUE si keyctl est défini à true dans ton config.yml
+  when: "current_ct.keyctl is defined and current_ct.keyctl | bool"
+
 # 2. CONFIGURATION ET MISE À JOUR DE BASE
 - name: "Système : Configurer le fuseau horaire sur Europe/Paris"
   community.general.timezone:
@@ -97,7 +126,7 @@
     dest: /etc/resolv.conf
     owner: nobody
     group: nogroup
-    mode: '0444' # 👈 Lecture seule pour absolument tout le monde
+    mode: '0444'
     content: |
       nameserver 192.168.1.105
       search home
@@ -115,21 +144,7 @@
   register: adguard_rewrites
   delegate_to: localhost
 
-- name: "AdGuard : Vérifier si le domaine existe avec une MAUVAISE adresse IP"
-  ansible.builtin.set_fact:
-    dns_needs_update: "{{ item.answer != ansible_facts['default_ipv4']['address'] }}"
-  loop: "{{ adguard_rewrites.json }}"
-  when: item.domain == (ansible_facts['hostname'] ~ '.home')
-  delegate_to: localhost
-
-- name: "AdGuard : Vérifier si la règle existe déjà avec la BONNE adresse IP"
-  ansible.builtin.set_fact:
-    dns_already_correct: true
-  loop: "{{ adguard_rewrites.json }}"
-  when: item.domain == (ansible_facts['hostname'] ~ '.home') and item.answer == ansible_facts['default_ipv4']['address']
-  delegate_to: localhost
-
-- name: "AdGuard : Supprimer l'ancienne réécriture DNS (IP obsolète)"
+- name: "AdGuard : Supprimer l'ancienne réécriture DNS (si elle existe avec une IP différente)"
   ansible.builtin.uri:
     url: "http://{{ current_ct.dns_server }}:80/control/rewrite/delete"
     method: POST
@@ -140,11 +155,12 @@
     body_format: json
     body:
       domain: "{{ ansible_facts['hostname'] }}.home"
-      answer: "{{ (adguard_rewrites.json | selectattr('domain', 'equalto', ansible_facts['hostname'] ~ '.home') | first).answer }}"
-  when: dns_needs_update is defined and dns_needs_update | bool
+      answer: "{{ item.answer }}"
+  loop: "{{ adguard_rewrites.json }}"
+  when: "item.domain == (ansible_facts['hostname'] ~ '.home') and item.answer != static_ip"
   delegate_to: localhost
 
-- name: "AdGuard : Créer la réécriture DNS"
+- name: "AdGuard : Créer ou mettre à jour la réécriture DNS avec l'IP du config.yml"
   ansible.builtin.uri:
     url: "http://{{ current_ct.dns_server }}:80/control/rewrite/add"
     method: POST
@@ -155,8 +171,9 @@
     body_format: json
     body:
       domain: "{{ ansible_facts['hostname'] }}.home"
-      answer: "{{ ansible_facts['default_ipv4']['address'] }}"
-  when: dns_already_correct is not defined and (dns_needs_update is not defined or dns_needs_update | bool)
+      answer: "{{ static_ip }}"
+  # On ne l'ajoute que si la règle exacte n'existe pas déjà
+  when: "adguard_rewrites.json | selectattr('domain', 'equalto', ansible_facts['hostname'] ~ '.home') | selectattr('answer', 'equalto', static_ip) | list | length == 0"
   delegate_to: localhost
 
 # 5. PERSONNALISATION DU SHELL

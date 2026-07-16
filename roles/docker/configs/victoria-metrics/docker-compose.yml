@@ -1,0 +1,30 @@
+services:
+  victoria-metrics:
+    container_name: victoriametrics
+    image: victoriametrics/victoria-metrics:latest
+    ports:
+      - 8428:8428
+    volumes:
+      - ./data:/victoria-metrics-data
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yaml
+    command:
+      - -storageDataPath=/victoria-metrics-data
+      - -promscrape.config=/etc/prometheus/prometheus.yaml
+    networks:
+      - proxy_network
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1  # Version stable et performante
+    container_name: cadvisor
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - proxy_network
+
+networks:
+  proxy_network:
+    external: true

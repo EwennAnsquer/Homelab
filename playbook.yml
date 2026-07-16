@@ -24,33 +24,12 @@
     - common
 
 # ==============================================================================
-# BLOC 3 : Déploiement des Applications Spécifiques (Cible par hôte)
+# BLOC 3 : Créer le container lxc avec docker
 # ==============================================================================
-- name: "Déploiement de Grafana"
-  hosts: grafana-test-iac
+- name: Déployer Docker sur le conteneur LXC de test
+  hosts: docker-lxc-test-iac
+  become: true
   vars_files:
     - config.yml
   roles:
-    - grafana
-
-# ==============================================================================
-# BLOC 4 : Déploiement de la base de données de métriques
-# ==============================================================================
-- name: "Déploiement de VictoriaMetrics"
-  hosts: victoria-metrics-test-iac
-  gather_facts: true
-  vars_files:
-    - config.yml
-  roles:
-    - victoria_metrics
-
-# ==============================================================================
-# BLOC 5 : Déploiement de nginx proxy manager
-# ==============================================================================
-- name: "Déploiement de Nginx Proxy Manager"
-  hosts: nginx-proxy-manager-test-iac
-  gather_facts: true
-  vars_files:
-    - config.yml
-  roles:
-    - nginx_proxy_manager
+    - docker

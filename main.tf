@@ -58,6 +58,7 @@ resource "proxmox_virtual_environment_container" "container_debian_13" {
     ip_config {
       ipv4 {
         address = each.value.address
+        gateway = each.value.gateway
       }
     }
 
