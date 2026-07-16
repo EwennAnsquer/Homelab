@@ -1,7 +1,0 @@
----
-# handlers file for roles/victoria_metrics
-
-- name: "Restart VictoriaMetrics"
-  ansible.builtin.systemd:
-    name: victoria-metrics
-    state: restarted

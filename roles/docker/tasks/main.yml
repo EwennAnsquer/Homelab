@@ -1,0 +1,103 @@
+---
+# tasks file for roles/docker
+
+- name: S'assurer que les dépendances de base sont installées
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - fuse-overlayfs
+    state: present
+    update_cache: yes
+
+- name: Créer le dossier pour la clé GPG de Docker
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: "Docker : Récupérer la clé GPG officielle"
+  ansible.builtin.get_url:
+    url: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}/gpg"
+    dest: /etc/apt/keyrings/docker.asc
+    mode: '0644'
+    force: true
+
+- name: "Docker : Ajouter le dépôt officiel (Format moderne Deb822)"
+  ansible.builtin.deb822_repository:
+    name: docker
+    types: [deb]
+    uris: "https://download.docker.com/linux/{{ ansible_facts['distribution'] | lower }}"
+    suites: ["{{ ansible_facts['distribution_release'] }}"]
+    components: [stable]
+    architectures: ["{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else ansible_facts['architecture'] }}"]
+    signed_by: /etc/apt/keyrings/docker.asc
+    state: present
+
+- name: Installer Docker Engine et Docker Compose
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+
+- name: S'assurer que le service Docker est démarré et activé
+  systemd:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Configurer le daemon Docker pour optimiser le stockage dans LXC
+  copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "storage-driver": "overlay2"
+      }
+    mode: '0644'
+  register: docker_config
+
+- name: Redémarrer Docker si la configuration a changé
+  systemd:
+    name: docker
+    state: restarted
+  when: docker_config.changed
+
+- name: Création du réseau Docker "proxy_network"
+  community.docker.docker_network:
+    name: proxy_network
+    driver: bridge
+    state: present
+
+- name: Créer le répertoire où toutes les docker compose seront stockés
+  ansible.builtin.file:
+    path: /opt/stacks
+    state: directory
+    mode: '0755'
+
+- name: Détecter tous les fichiers docker compose locaux
+  delegate_to: localhost
+  become: false
+  run_once: true
+  ansible.builtin.find:
+    paths: "{{ role_path }}/configs"
+    recurse: yes
+    file_type: file
+    patterns:
+      - "docker-compose.yml"
+      - "docker-compose.yaml"
+  register: found_compose_files
+
+- name: Déployer dynamiquement chaque service trouvé
+  ansible.builtin.include_tasks: deploy_service.yml
+  vars:
+    service_name: "{{ item.path | dirname | basename }}"
+    local_compose_path: "{{ item.path }}"
+  loop: "{{ found_compose_files.files }}"
