@@ -1,0 +1,41 @@
+---
+# tasks/deploy_service.yml
+
+- name: "[{{ service_name }}] Définir le chemin de destination sur le serveur"
+  ansible.builtin.set_fact:
+    target_path: "{{ '/opt/dockge' if service_name == 'dockge' else '/opt/stacks/' ~ service_name }}"
+
+- name: "[{{ service_name }}] Créer le répertoire sur le serveur"
+  ansible.builtin.file:
+    path: "{{ target_path }}"
+    state: directory
+    mode: '0755'
+
+- name: "[{{ service_name }}] Créer un dossier data universel"
+  ansible.builtin.file:
+    path: "{{ target_path }}/data"
+    state: directory
+    mode: '0777' # Tout le monde (y compris les utilisateurs non-root des conteneurs) peut écrire dedans
+
+- name: "[{{ service_name }}] Vérifier si des tâches spécifiques existent localement"
+  delegate_to: localhost
+  become: false
+  ansible.builtin.stat:
+    path: "{{ role_path }}/tasks/{{ service_name }}.yml"
+  register: service_tasks_file
+
+- name: "[{{ service_name }}] Exécuter les tâches spécifiques du service"
+  ansible.builtin.include_tasks: "{{ service_name }}.yml"
+  when: service_tasks_file.stat.exists
+
+- name: "[{{ service_name }}] Copier tous les fichiers de configuration du service"
+  ansible.builtin.copy:
+    # Le "/" à la fin de la source dit à Ansible de copier le CONTENU du dossier local
+    src: "{{ local_compose_path | dirname }}/" 
+    dest: "{{ target_path }}/"
+    mode: '0644'
+
+- name: "[{{ service_name }}] Lancer le conteneur"
+  community.docker.docker_compose_v2:
+    project_src: "{{ target_path }}"
+    state: present
