@@ -2,7 +2,7 @@ proxmox:
   ip: "192.168.1.100"
   endpoint: "https://192.168.1.100:8006/"
   node_name: "proxmox"
-  api_token: "root@pam!test-iac=6b31760c-b6b3-4c58-aae6-b7e68dfa68e1"
+  api_token: "root@pam!iac=e434a5ba-0c09-4724-bf75-e9a3381fda90"
   storage_pbs: "proxmox-backup-server-local"
 
 ansible:
@@ -10,51 +10,21 @@ ansible:
   ansible_ssh_private_key_file: "~/.ssh/id_25519_ansible"
 
 containers:
-  - vm_id: 901
-    hostname: "grafana-test-iac"
+  - vm_id: 300
+    hostname: "docker-lxc-test-iac"
     type: "debian"
     cores: 4
-    memory: 512
-    disk_size: 8
-    dns_server: "192.168.1.105"
-    template: "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
-    tags: ["debian", "ansible", "iac", "ip dhcp"]
-    address: "dhcp"
-    keys: [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILoOMCJMoxOqd2ZJ0Yux1+qXa9sDg4oJPmhojF90a/lV ansible" ] 
-    datastore_id: "local-lvm"
-    nesting: true
-    network_interface_name: "eth0"
-    network_interface_bridge: "vmbr0"
-
-  - vm_id: 902
-    hostname: "victoria-metrics-test-iac"
-    type: "debian"
-    cores: 2
-    memory: 256
-    disk_size: 8
-    dns_server: "192.168.1.105"
-    template: "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
-    tags: ["debian", "ansible", "iac", "ip dhcp"]
-    address: "dhcp"
-    keys: [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILoOMCJMoxOqd2ZJ0Yux1+qXa9sDg4oJPmhojF90a/lV ansible" ] 
-    datastore_id: "local-lvm"
-    nesting: true
-    network_interface_name: "eth0"
-    network_interface_bridge: "vmbr0"
-
-  - vm_id: 903
-    hostname: "nginx-proxy-manager-test-iac"
-    type: "debian"
-    cores: 2
     memory: 1024
-    disk_size: 8
+    disk_size: 20
     dns_server: "192.168.1.105"
     template: "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
-    tags: ["debian", "ansible", "iac", "ip dhcp"]
-    address: "dhcp"
+    tags: ["debian", "ansible", "iac", "docker", "test"]
+    address: "192.168.1.120/24"
+    gateway: "192.168.1.1"
     keys: [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILoOMCJMoxOqd2ZJ0Yux1+qXa9sDg4oJPmhojF90a/lV ansible" ] 
     datastore_id: "local-lvm"
     nesting: true
+    keyctl: true
     network_interface_name: "eth0"
     network_interface_bridge: "vmbr0"
 

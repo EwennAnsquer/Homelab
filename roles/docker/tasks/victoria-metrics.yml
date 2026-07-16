@@ -1,0 +1,25 @@
+---
+# tasks/victoria-metrics.yml
+
+- name: "[victoria-metrics] Récupérer le hostname et générer le FQDN local"
+  ansible.builtin.set_fact:
+    current_container_fqdn: >-
+      {{ (containers | selectattr('hostname', 'equalto', inventory_hostname) | map(attribute='hostname') | first | default(inventory_hostname)) }}.home
+
+- name: "[victoria-metrics] Initialiser un prometheus.yaml minimal s'il n'existe pas"
+  ansible.builtin.copy:
+    dest: "{{ target_path }}/prometheus.yaml"
+    content: |
+      global:
+        scrape_interval: 15s
+
+      scrape_configs:
+        - job_name: 'node-exporter-lxc'
+          static_configs:
+            - targets: ['{{ current_container_fqdn }}:9100']
+
+        - job_name: 'cadvisor'
+          static_configs:
+            - targets: ['cadvisor:8080']
+    force: true
+    mode: '0644'

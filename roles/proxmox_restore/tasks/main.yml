@@ -39,9 +39,47 @@
     ansible_user: "{{ ansible.ansible_user }}"
     ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
 
-- name: "Python : Découverte globale des IPs DHCP"
-  ansible.builtin.command: "python3 get_lxc_ip.py"
-  delegate_to: localhost
+- name: "Ansible : Injecter les conteneurs du config.yml dans l'inventaire actif"
+  ansible.builtin.add_host:
+    name: "{{ item.hostname }}"
+    # On extrait l'IP propre (sans le masque /24)
+    ansible_host: "{{ item.address | split('/') | first }}"
+    ansible_user: "{{ ansible.ansible_user }}"
+    ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
+    # On l'ajoute au groupe magique 'all' pour que le Bloc 2 ('hosts: all') le cible
+    groups:
+      - all
+    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  loop: "{{ containers }}"
+  # On n'ajoute que les conteneurs qui ont une adresse IP statique définie
+  when: "item.address is defined and 'dhcp' not in item.address"
 
-- name: "Ansible : Recharger le nouvel inventaire complet"
-  ansible.builtin.meta: refresh_inventory
+# 4. ACTION : ATTENDRE QUE PROXMOX CONFIRME LE STATUT RUNNING
+- name: "Proxmox : Attendre que le conteneur soit marqué en 'running' par l'hyperviseur"
+  ansible.builtin.command: "pct status {{ item.vm_id }}"
+  register: lxc_status
+  # On boucle jusqu'à ce que la commande renvoie "status: running"
+  until: "'status: running' in lxc_status.stdout"
+  retries: 10         # On essaie 10 fois maximum
+  delay: 2            # On attend 2 secondes entre chaque essai (total de 20 secondes max)
+  delegate_to: "{{ proxmox.ip }}" # On interroge directement Proxmox en root
+  loop: "{{ containers }}"
+  vars:
+    ansible_user: "{{ ansible.ansible_user }}"
+    ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
+
+# 5. ACTION : ATTENDRE QUE LE PORT SSH SOIT DISPONIBLE
+- name: "Ansible : Attendre que le SSH (port 22) soit prêt sur les conteneurs"
+  ansible.builtin.wait_for:
+    host: "{{ item.address | split('/') | first }}"
+    port: 22
+    state: started
+    delay: 3         # Attend 3 secondes avant de commencer à tester
+    timeout: 60      # Abandonne et lève une erreur si le conteneur ne répond pas après 60 secondes
+  delegate_to: localhost # Très important : on teste le port depuis ta machine Ansible, pas depuis le conteneur lui-même !
+  loop: "{{ containers }}"
+  when: "item.address is defined and 'dhcp' not in item.address"
+
+- name: "Ansible : Pause de sécurité pour l'initialisation de l'OS"
+  ansible.builtin.pause:
+    seconds: 5

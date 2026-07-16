@@ -5,3 +5,11 @@
   ansible.builtin.systemd:
     name: node_exporter
     state: restarted
+
+- name: "Redémarrer le conteneur LXC"
+  ansible.builtin.command: "pct reboot {{ current_ct.vm_id }}"
+  delegate_to: "{{ proxmox.ip }}"
+  listen: "Redémarrer le conteneur LXC"
+  vars:
+    ansible_user: "{{ ansible.ansible_user }}"
+    ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
