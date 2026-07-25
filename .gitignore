@@ -23,6 +23,7 @@ terraform.rc
 *.crt
 *.env
 *.secret
+*.ini
 
 # Editor / OS files
 .vscode/
