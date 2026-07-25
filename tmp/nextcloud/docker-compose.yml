@@ -1,0 +1,42 @@
+services:
+  db:
+    image: mariadb:10.6
+    restart: always
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW
+    volumes:
+      - ./db_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=changemeroot
+      - MYSQL_PASSWORD=changemesql
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+  redis:
+    image: redis:alpine
+    restart: always
+  nextcloud:
+    image: nextcloud:latest
+    restart: always
+    links:
+      - db
+      - redis
+    volumes:
+      - ./nextcloud_data:/var/www/html
+    environment:
+      - MYSQL_PASSWORD=changemesql
+      - MYSQL_DATABASE=nextcloud
+      - MYSQL_USER=nextcloud
+      - MYSQL_HOST=db
+      - REDIS_HOST=redis
+    depends_on:
+      - db
+      - redis
+    networks:
+      - proxy_network
+
+volumes:
+  db_data: null
+  nextcloud_data: null
+
+networks:
+  proxy_network:
+    external: true

@@ -4,9 +4,9 @@ services:
     container_name: uptime-kuma
     restart: always
     volumes:
-      - /path/to/data:/app/data # Configuring persistent storage
+      - ./data:/app/data # Configuring persistent storage
     environment:
-      - TZ=UTC # Set the timezone (change to your preferred local timezone so monitoring times are the same)
+      - TZ=FR # Set the timezone (change to your preferred local timezone so monitoring times are the same)
       - UMASK=0022 # Set your file permissions manually
     networks:
       - proxy_network

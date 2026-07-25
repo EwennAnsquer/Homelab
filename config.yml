@@ -14,8 +14,8 @@ containers:
     hostname: "docker-lxc-test-iac"
     type: "debian"
     cores: 4
-    memory: 1024
-    disk_size: 20
+    memory: 3048
+    disk_size: 40
     dns_server: "192.168.1.105"
     template: "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
     tags: ["debian", "ansible", "iac", "docker", "test"]
