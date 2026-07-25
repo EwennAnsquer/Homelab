@@ -1,14 +1,19 @@
 services:
-  npm:
+  nginx-proxy-manager:
     image: jc21/nginx-proxy-manager:latest
     restart: unless-stopped
+    environment:
+      INITIAL_ADMIN_EMAIL: ${EMAIL}
+      INITIAL_ADMIN_PASSWORD: ${PASSWORD}
     ports:
-      - 80:80
       - 81:81
       - 443:443
     volumes:
       - ./data:/data
       - ./letsencrypt:/etc/letsencrypt
+      - ./ovh.ini:/etc/letsencrypt/ovh.ini:ro
+      - ./letsencrypt/live/azby.fr/fullchain.pem:/data/nginx/dummy_cert.pem
+      - ./letsencrypt/live/azby.fr/privkey.pem:/data/nginx/dummy_key.pem
     networks:
       - proxy_network
 networks:
