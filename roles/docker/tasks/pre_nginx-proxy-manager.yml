@@ -1,0 +1,56 @@
+---
+# tasks/pre_nginx-proxy-manager.yml
+
+- name: "NPM : Installer les prérequis système (Python3, Pip et Sqlite3)"
+  ansible.builtin.apt:
+    name:
+      - python3
+      - python3-pip
+      - python3-venv
+      - sqlite3
+    state: present
+    update_cache: true
+
+- name: "NPM : Installer Certbot et le plugin DNS OVH via PIP"
+  ansible.builtin.pip:
+    name:
+      - certbot
+      - certbot-dns-ovh
+    state: present
+    extra_args: --break-system-packages
+
+- name: "NPM : Créer les sous-dossiers de l'application"
+  ansible.builtin.file:
+    path: "/opt/stacks/nginx-proxy-manager/{{ npm_folder }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - data
+    - letsencrypt
+  loop_control:
+    loop_var: npm_folder
+
+- name: "NPM : Lire le fichier .env distant"
+  ansible.builtin.slurp:
+    src: /opt/stacks/nginx-proxy-manager/.env
+  register: remote_env
+
+- name: "NPM : Convertir le .env en dictionnaire de variables"
+  ansible.builtin.set_fact:
+    env_vars: "{{ (remote_env.content | b64decode | regex_replace('\\r\\n', '\n') | regex_replace(' = ', ': ') | regex_replace('=', ': ')) | from_yaml }}"
+
+- name: "NPM : Générer le certificat Wildcard via l'API OVH"
+  ansible.builtin.command: >
+    certbot certonly --dns-ovh 
+    --dns-ovh-credentials "{{ env_dir }}/ovh.ini" 
+    -d "*.{{ env_domain }}" -d "{{ env_domain }}" 
+    --config-dir "{{ env_dir }}/letsencrypt"
+    --work-dir "{{ env_dir }}/letsencrypt/work"
+    --logs-dir "{{ env_dir }}/letsencrypt/logs"
+    --email "{{ env_email }}" --agree-tos --non-interactive
+  args:
+    creates: "{{ env_dir }}/letsencrypt/live/{{ env_domain }}/fullchain.pem"
+  vars:
+    env_domain: "{{ env_vars.DOMAINE_NAME }}"
+    env_email: "{{ env_vars.EMAIL }}"
+    env_dir: "{{ env_vars.DIR }}"

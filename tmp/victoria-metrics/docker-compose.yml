@@ -2,8 +2,6 @@ services:
   victoria-metrics:
     container_name: victoriametrics
     image: victoriametrics/victoria-metrics:latest
-    ports:
-      - 8428:8428
     volumes:
       - ./data:/victoria-metrics-data
       - ./prometheus.yaml:/etc/prometheus/prometheus.yaml
