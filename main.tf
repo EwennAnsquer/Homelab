@@ -62,11 +62,6 @@ resource "proxmox_virtual_environment_container" "container_debian_13" {
       }
     }
 
-    dns {
-      # Adresse IP de ton serveur AdGuard Home
-      servers = [each.value.dns_server]
-    }
-
     user_account {
       # Clé SSH publique pour qu'Ansible puisse s'y connecter
       keys     = each.value.keys

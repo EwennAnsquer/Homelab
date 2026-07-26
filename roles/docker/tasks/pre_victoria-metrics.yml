@@ -23,3 +23,5 @@
             - targets: ['cadvisor:8080']
     force: true
     mode: '0644'
+
+  notify: "Redémarrer victoria metrics"

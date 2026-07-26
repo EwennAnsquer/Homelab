@@ -50,4 +50,4 @@ ansible.log
 .vault_pass
 vault_password.txt
 
-hosts.yml
+config.yml

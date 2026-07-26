@@ -12,6 +12,13 @@ services:
       - HBOX_AUTH_API_KEY_PEPPER=dkCljDjS1Dm86HgWXuVMkmsXSkBeKwMzdGIIorhaH188FsOtyIGejlMHxd0RX/pn
     volumes:
       - ./homebox-data:/data/
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.homebox.rule=Host(`homebox.azby.fr`)
+      - traefik.http.routers.homebox.entrypoints=websecure
+      - traefik.http.routers.homebox.tls=true
+      - traefik.http.routers.homebox.tls.certresolver=ovh
+      - traefik.http.services.homebox.loadbalancer.server.port=7745
     networks:
       - proxy_network
 volumes:

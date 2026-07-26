@@ -1,0 +1,56 @@
+services:
+  traefik:
+    image: traefik:v3
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - 80:80
+      - 443:443
+    environment:
+      - OVH_ENDPOINT=${OVH_ENDPOINT}
+      - OVH_APPLICATION_KEY=${OVH_APPLICATION_KEY}
+      - OVH_APPLICATION_SECRET=${OVH_APPLICATION_SECRET}
+      - OVH_CONSUMER_KEY=${OVH_CONSUMER_KEY}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      - /opt/stacks/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      - proxy_network
+    labels:
+      - traefik.enable=true
+      # Dashboard Traefik (sur son propre sous-domaine)
+      - traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN}`)
+      - traefik.http.routers.traefik-dashboard.entrypoints=websecure
+      - traefik.http.routers.traefik-dashboard.tls=true
+      - traefik.http.routers.traefik-dashboard.tls.certresolver=ovh
+      - traefik.http.routers.traefik-dashboard.service=api@internal
+      - traefik.http.routers.traefik-dashboard.middlewares=traefik-auth
+      - traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_DASHBOARD_USER}:${TRAEFIK_DASHBOARD_HASH}
+
+  traefik-manager:
+    image: ghcr.io/chr0nzz/traefik-manager:latest
+    container_name: traefik-manager
+    restart: unless-stopped
+    networks:
+      - proxy_network
+    environment:
+      - COOKIE_SECURE=false
+    labels:
+      - traefik.enable=true
+      # Traefik Manager (sur un sous-domaine différent)
+      - traefik.http.routers.traefik-manager.rule=Host(`traefik-manager.${DOMAIN}`)
+      - traefik.http.routers.traefik-manager.entrypoints=websecure
+      - traefik.http.routers.traefik-manager.tls=true
+      - traefik.http.routers.traefik-manager.tls.certresolver=ovh
+      - traefik.http.services.traefik-manager.loadbalancer.server.port=5000
+    volumes:
+      - /opt/stacks/traefik/traefik-manager/config:/app/config
+      - /opt/stacks/traefik/traefik-manager/backups:/app/backups
+      - /opt/stacks/traefik/dynamic.yml:/app/config/dynamic.yml
+networks:
+  proxy_network:
+    external: true
