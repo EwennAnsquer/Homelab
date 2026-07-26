@@ -27,7 +27,7 @@
 # BLOC 3 : Créer le container lxc avec docker
 # ==============================================================================
 - name: Déployer Docker sur le conteneur LXC de test
-  hosts: docker-lxc-test-iac
+  hosts: docker
   become: true
   vars_files:
     - config.yml

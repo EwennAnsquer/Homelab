@@ -8,6 +8,13 @@ services:
     command:
       - -storageDataPath=/victoria-metrics-data
       - -promscrape.config=/etc/prometheus/prometheus.yaml
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.victoria-metrics.rule=Host(`victoria-metrics.azby.fr`)
+      - traefik.http.routers.victoria-metrics.entrypoints=websecure
+      - traefik.http.routers.victoria-metrics.tls=true
+      - traefik.http.routers.victoria-metrics.tls.certresolver=ovh
+      - traefik.http.services.victoria-metrics.loadbalancer.server.port=8428
     networks:
       - proxy_network
 

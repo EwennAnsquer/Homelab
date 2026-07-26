@@ -3,7 +3,7 @@
 
 # 1. ON RÉCUPÈRE LA LISTE BRUTE DES SAUVEGARDES DEPUIS PROXMOX
 - name: "Proxmox : Lister les sauvegardes disponibles pour chaque CT"
-  ansible.builtin.command: "pvesm list proxmox-backup-server-local --vmid {{ item.vm_id }}"
+  ansible.builtin.command: "pvesm list {{ proxmox.storage_pbs }} --vmid {{ item.vm_id }}"
   register: pbs_backups_list
   delegate_to: "{{ proxmox.ip }}"
   loop: "{{ containers }}"

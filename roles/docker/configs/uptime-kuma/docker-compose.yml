@@ -8,6 +8,13 @@ services:
     environment:
       - TZ=FR # Set the timezone (change to your preferred local timezone so monitoring times are the same)
       - UMASK=0022 # Set your file permissions manually
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.uptime-kuma.rule=Host(`uptime-kuma.azby.fr`)
+      - traefik.http.routers.uptime-kuma.entrypoints=websecure
+      - traefik.http.routers.uptime-kuma.tls=true
+      - traefik.http.routers.uptime-kuma.tls.certresolver=ovh
+      - traefik.http.services.uptime-kuma.loadbalancer.server.port=3001
     networks:
       - proxy_network
     healthcheck:
