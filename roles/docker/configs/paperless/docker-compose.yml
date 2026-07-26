@@ -6,6 +6,7 @@ services:
       - redisdata:/data
     networks:
       - proxy_network
+
   paperless:
     image: ghcr.io/paperless-ngx/paperless-ngx:latest
     restart: unless-stopped
@@ -19,7 +20,7 @@ services:
       - ./export:/usr/src/paperless/export
       - ./consume:/usr/src/paperless/consume
     environment:
-      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_REDIS: redis://redis:6379
       PAPERLESS_TIKA_ENABLED: 1
       PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://gotenberg:3000
       PAPERLESS_TIKA_ENDPOINT: http://tika:9998
@@ -29,8 +30,16 @@ services:
       PAPERLESS_OCR_LANGUAGE: fra
       USERMAP_UID: 1000
       USERMAP_GID: 1000
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.paperless.rule=Host(`paperless.azby.fr`)
+      - traefik.http.routers.paperless.entrypoints=websecure
+      - traefik.http.routers.paperless.tls=true
+      - traefik.http.routers.paperless.tls.certresolver=ovh
+      - traefik.http.services.paperless.loadbalancer.server.port=8000
     networks:
       - proxy_network
+
   gotenberg:
     image: docker.io/gotenberg/gotenberg:8.25
     restart: unless-stopped
@@ -40,11 +49,13 @@ services:
       - --chromium-allow-list=file:///tmp/.*
     networks:
       - proxy_network
+
   tika:
     image: docker.io/apache/tika:latest
     restart: unless-stopped
     networks:
       - proxy_network
+
 volumes:
   redisdata: null
 
