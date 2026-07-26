@@ -1,25 +1,24 @@
 proxmox:
-  ip: "192.168.1.100"
-  endpoint: "https://192.168.1.100:8006/"
-  node_name: "proxmox"
+  ip: "192.168.1.200"
+  endpoint: "https://192.168.1.200:8006/"
+  node_name: "dell-optiplex-3000-micro"
   api_token: "root@pam!iac=e434a5ba-0c09-4724-bf75-e9a3381fda90"
-  storage_pbs: "proxmox-backup-server-local"
+  storage_pbs: "pbs-backup"
 
 ansible:
   ansible_user: "root"
-  ansible_ssh_private_key_file: "~/.ssh/id_25519_ansible"
+  ansible_ssh_private_key_file: "~/.ssh/ansible"
 
 containers:
-  - vm_id: 300
-    hostname: "docker-lxc-test-iac"
+  - vm_id: 200
+    hostname: "docker"
     type: "debian"
-    cores: 4
-    memory: 3048
+    cores: 8
+    memory: 4096
     disk_size: 40
-    dns_server: "192.168.1.105"
-    template: "local:vztmpl/debian-13-standard_13.1-2_amd64.tar.zst"
-    tags: ["debian", "ansible", "iac", "docker", "test"]
-    address: "192.168.1.120/24"
+    template: "local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst"
+    tags: ["debian", "ansible", "terraform"]
+    address: "192.168.1.220/24"
     gateway: "192.168.1.1"
     keys: [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILoOMCJMoxOqd2ZJ0Yux1+qXa9sDg4oJPmhojF90a/lV ansible" ] 
     datastore_id: "local-lvm"

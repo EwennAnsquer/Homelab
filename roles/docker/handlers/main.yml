@@ -1,0 +1,12 @@
+---
+# handlers file for roles/docker
+
+- name: "Redémarrer traefik"
+  community.docker.docker_compose_v2:
+    project_src: /opt/stacks/traefik
+    state: restarted
+
+- name: "Redémarrer victoria metrics"
+  community.docker.docker_compose_v2:
+    project_src: /opt/stacks/victoria-metrics
+    state: restarted
