@@ -1,7 +1,7 @@
 ---
 # tasks/post_dockhand.yml
 
-- name: "[dockhand] Attendre que l'API réponde correctement"
+- name: "[dockhand 1/7] Attendre que l'API réponde"
   ansible.builtin.uri:
     url: "https://dockhand.azby.fr/api/environments"
     method: GET
@@ -11,116 +11,69 @@
   retries: 30
   delay: 5
 
-- name: "[dockhand] Configurer l'environnement docker-socket-proxy"
-  vars:
-    dockhand_base_url: "https://dockhand.azby.fr"
-    dockhand_headers:
+- name: "[dockhand 2/7] Lister les environnements existants"
+  ansible.builtin.uri:
+    url: "https://dockhand.azby.fr/api/environments"
+    method: GET
+    headers:
       Content-Type: "application/json"
-      # Authorization: "Bearer {{ dockhand_api_token }}"   # décommenter si auth activée
+    status_code: [200]
+  register: existing_envs
 
-  block:
-    # --- 1. Lister les environnements existants ---
-    - name: "Vérifier si l'environnement 'docker' existe déjà"
-      ansible.builtin.uri:
-        url: "{{ dockhand_base_url }}/api/environments"
-        method: GET
-        headers: "{{ dockhand_headers }}"
-        status_code: [200]
-      register: existing_envs
+- name: "[dockhand 3/7] Extraire l'ID de l'environnement"
+  ansible.builtin.set_fact:
+    dockhand_env_id: "{{ (existing_envs.json | selectattr('name', 'equalto', 'docker') | map(attribute='id') | first) | default(none) }}"
 
-    - name: "Extraire l'ID de l'environnement s'il existe déjà"
-      ansible.builtin.set_fact:
-        dockhand_env_id: "{{ (existing_envs.json | selectattr('name', 'equalto', 'docker') | map(attribute='id') | first) | default(none) }}"
+- name: "[dockhand 4/7] Créer l'environnement si absent"
+  ansible.builtin.uri:
+    url: "https://dockhand.azby.fr/api/environments"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      name: "docker"
+      host: "docker-socket-proxy"
+      connectionType: "direct"
+      port: 2375
+      protocol: "http"
+      publicIp: "docker-socket-proxy"
+    status_code: [200, 201]
+  register: created_env
+  when: dockhand_env_id is none
 
-    # --- 2. Créer l'environnement uniquement s'il n'existe pas ---
-    - name: "Créer l'environnement 'docker'"
-      ansible.builtin.uri:
-        url: "{{ dockhand_base_url }}/api/environments"
-        method: POST
-        headers: "{{ dockhand_headers }}"
-        body_format: json
-        body:
-          name: "docker"
-          host: "docker-socket-proxy"
-          connectionType: "direct"
-          port: 2375
-          protocol: "http"
-          publicIp: "docker-socket-proxy"
-        status_code: [200, 201]
-      register: created_env
-      when: dockhand_env_id is none
+- name: "[dockhand 5/7] Mettre à jour l'ID si fraîchement créé"
+  ansible.builtin.set_fact:
+    dockhand_env_id: "{{ created_env.json.id }}"
+  when: dockhand_env_id is none and created_env is defined and created_env.json is defined
 
-    - name: "Définir l'ID s'il vient d'être créé"
-      ansible.builtin.set_fact:
-        dockhand_env_id: "{{ created_env.json.id }}"
-      when: dockhand_env_id is none
+- name: "[dockhand 6/7] Configurer le check de mises à jour"
+  ansible.builtin.uri:
+    url: "https://dockhand.azby.fr/api/environments/{{ dockhand_env_id }}/update-check"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      enabled: "true"
+      autoUpdate: "false"
+      cron: "0 4 * * *"
+      vulnerabilityCriteria: "more_than_current"
+    status_code: [200, 201]
 
-    # --- CONFIRMÉ : onglet Updates - scheduled update check ---
-    - name: "Configurer le check de mises à jour (Daily 04:00, pas d'auto-update)"
-      ansible.builtin.uri:
-        url: "{{ dockhand_base_url }}/api/environments/{{ dockhand_env_id }}/update-check"
-        method: POST
-        headers: "{{ dockhand_headers }}"
-        body_format: json
-        body:
-          enabled: "true"
-          autoUpdate: "false"
-          cron: "0 4 * * *"
-          vulnerabilityCriteria: "more_than_current"
-        status_code: [200, 201]
-
-    # --- CONFIRMÉ : onglet Security - vulnerability scanner ---
-    - name: "Activer le scan de vulnérabilités (Grype + Trivy)"
-      ansible.builtin.uri:
-        url: "{{ dockhand_base_url }}/api/settings/scanner"
-        method: POST
-        headers: "{{ dockhand_headers }}"
-        body_format: json
-        body:
-          envID: "{{ dockhand_env_id }}"
-          scanner: "both"
-        status_code: [200, 201]
-
-    # --- NON CONFIRMÉ : onglet Updates - automatic image pruning ---
-    # Weekly, dimanche 03:00, mode "dangling only"
-    - name: "Configurer le prune automatique d'images (à vérifier)"
-      ansible.builtin.uri:
-        url: "{{ dockhand_base_url }}/api/environments/{{ dockhand_env_id }}/image-prune"
-        method: POST
-        headers: "{{ dockhand_headers }}"
-        body_format: json
-        body:
-          enabled: "true"
-          cron: "0 3 * * 0"
-          mode: "dangling"
-        status_code: [200, 201]
-      ignore_errors: true   # à retirer une fois l'endpoint validé
-
-    # --- NON CONFIRMÉ : onglet Activity ---
-    - name: "Configurer les options d'activité (à vérifier)"
-      ansible.builtin.uri:
-        url: "{{ dockhand_base_url }}/api/environments/{{ dockhand_env_id }}/activity"
-        method: POST
-        headers: "{{ dockhand_headers }}"
-        body_format: json
-        body:
-          collectContainerActivity: true
-          collectSystemMetrics: true
-          highlightValueChanges: true
-          diskSpaceWarnings: true
-          diskSpaceThresholdType: "percentage"
-          diskSpaceThreshold: 80
-        status_code: [200, 201]
-      ignore_errors: true   # à retirer une fois l'endpoint validé
-
-    # --- Timezone (visible dans l'onglet Updates, en bas) ---
-    - name: "Définir le fuseau horaire de l'environnement (à vérifier)"
-      ansible.builtin.uri:
-        url: "{{ dockhand_base_url }}/api/environments/{{ dockhand_env_id }}"
-        method: PATCH
-        headers: "{{ dockhand_headers }}"
-        body_format: json
-        body:
-          timezone: "Europe/Paris"
-        status_code: [200, 201]
-      ignore_errors: true   # à retirer une fois l'endpoint validé
+- name: "[dockhand 7/7] Configurer les options globales d'environnement"
+  ansible.builtin.uri:
+    url: "https://dockhand.azby.fr/api/environments/{{ dockhand_env_id }}"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      timezone: "Europe/Paris"
+      collectActivity: true
+      collectMetrics: true
+      highlightChanges: true
+      diskSpaceWarnings: true
+      diskSpaceThresholdType: "percentage"
+      diskSpaceThreshold: 80
+    status_code: [200, 204]
