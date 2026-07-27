@@ -101,3 +101,8 @@
     service_name: "{{ item.path | dirname | basename }}"
     local_compose_path: "{{ item.path }}"
   loop: "{{ found_compose_files.files }}"
+
+- name: Exécuter toutes les post-tâches enregistrées une fois tous les services démarrés
+  ansible.builtin.include_tasks: "post_{{ item }}.yml"
+  loop: "{{ pending_post_services | default([]) }}"
+  when: pending_post_services is defined and (pending_post_services | length > 0)

@@ -121,65 +121,7 @@
     state: started
     daemon_reload: yes
 
-- name: "DNS : Forcer l'utilisation d'AdGuard Home dans le resolv.conf"
-  ansible.builtin.copy:
-    dest: /etc/resolv.conf
-    owner: nobody
-    group: nogroup
-    mode: '0444'
-    content: |
-      nameserver 192.168.1.105
-      search home
-  when: "'adguard' not in ansible_facts['hostname']"
-
-# 4. GESTION AUTOMATIQUE DU DNS ADGUARD
-- name: "AdGuard : Gérer la réécriture DNS (uniquement si dns_server est renseigné)"
-  block:
-    - name: "AdGuard : Récupérer la liste des réécritures DNS existantes"
-      ansible.builtin.uri:
-        url: "http://{{ current_ct.dns_server }}:80/control/rewrite/list"
-        method: GET
-        user: "root"
-        password: "adguard_pour_avoir_mon_dns"
-        force_basic_auth: yes
-        status_code: 200
-      register: adguard_rewrites
-      delegate_to: localhost
-
-    - name: "AdGuard : Supprimer l'ancienne réécriture DNS (si elle existe avec une IP différente)"
-      ansible.builtin.uri:
-        url: "http://{{ current_ct.dns_server }}:80/control/rewrite/delete"
-        method: POST
-        user: "root"
-        password: "adguard_pour_avoir_mon_dns"
-        force_basic_auth: yes
-        status_code: [200, 201]
-        body_format: json
-        body:
-          domain: "{{ ansible_facts['hostname'] }}.home"
-          answer: "{{ item.answer }}"
-      loop: "{{ adguard_rewrites.json }}"
-      when: "item.domain == (ansible_facts['hostname'] ~ '.home') and item.answer != static_ip"
-      delegate_to: localhost
-
-    - name: "AdGuard : Créer ou mettre à jour la réécriture DNS avec l'IP du config.yml"
-      ansible.builtin.uri:
-        url: "http://{{ current_ct.dns_server }}:80/control/rewrite/add"
-        method: POST
-        user: "root"
-        password: "adguard_pour_avoir_mon_dns"
-        force_basic_auth: yes
-        status_code: [200, 201]
-        body_format: json
-        body:
-          domain: "{{ ansible_facts['hostname'] }}.home"
-          answer: "{{ static_ip }}"
-      when: "adguard_rewrites.json | selectattr('domain', 'equalto', ansible_facts['hostname'] ~ '.home') | selectattr('answer', 'equalto', static_ip) | list | length == 0"
-      delegate_to: localhost
-
-  when: "current_ct.dns_server is defined and current_ct.dns_server | length > 0"
-
-# 5. PERSONNALISATION DU SHELL
+# 4. PERSONNALISATION DU SHELL
 - name: "Système : Activer les alias de base (.bashrc)"
   ansible.builtin.lineinfile:
     path: /root/.bashrc
