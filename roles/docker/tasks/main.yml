@@ -74,9 +74,6 @@
   community.docker.docker_network:
     name: proxy_network
     driver: bridge
-    ipam_config:
-      - subnet: 172.18.0.0/24
-        gateway: 172.18.0.1
     state: present
 
 - name: Créer le répertoire où toutes les docker compose seront stockés
