@@ -1,0 +1,4 @@
+# inventory/group_vars/all/vault.yml
+
+vault_proxmox_api_token: ""
+vault_tailscale_authkey: ""
