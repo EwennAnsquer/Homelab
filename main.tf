@@ -19,7 +19,7 @@ provider "proxmox" {
 }
 
 locals {
-  cfg = yamldecode(file("${path.module}/config.yml"))
+  cfg = yamldecode(file("${path.module}/hosts.yml"))
   
   # On transforme la liste des conteneurs en une map indexée par hostname pour le for_each
   lxc_map = { for c in local.cfg.containers : c.hostname => c }
