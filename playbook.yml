@@ -6,11 +6,12 @@
   hosts: localhost
   gather_facts: false
   vars_files:
-    - config.yml
-  tasks: # Utiliser tasks au lieu de role permet de rajouter d'autres tâches aux besoins
+    - hosts.yml
+  tasks:
     - name: "Restauration des LXC"
       ansible.builtin.include_role:
         name: proxmox_restore
+      when: terraform_ran | bool
 
 # ==============================================================================
 # BLOC 2 : Configuration de Base du Système (Tous les LXC)
@@ -19,17 +20,29 @@
   hosts: all
   gather_facts: true
   vars_files:
-    - config.yml
+    - hosts.yml
   roles:
-    - common
+    - role: common
+      when: terraform_ran | bool
 
 # ==============================================================================
 # BLOC 3 : Créer le container lxc avec docker
 # ==============================================================================
-- name: Déployer Docker sur le conteneur LXC de test
-  hosts: docker
+- name: Déployer Docker sur le conteneur LXC
+  hosts: docker_hosts
   become: true
   vars_files:
-    - config.yml
+    - hosts.yml
   roles:
     - docker
+
+# ==============================================================================
+# BLOC 4 : Déployer Tailscale
+# ==============================================================================
+- name: Déployer Tailscale
+  hosts: docker_hosts
+  become: true
+  vars_files:
+    - hosts.yml
+  roles:
+    - tailscale

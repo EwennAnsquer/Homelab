@@ -39,9 +39,6 @@ terraform.rc
 # roles/externals/
 collections/
 
-# Fichiers de configuration locale d'Ansible (si tu crées un ansible.cfg spécifique)
-ansible.cfg
-
 # Fichiers de logs locaux
 ansible.log
 
@@ -50,4 +47,7 @@ ansible.log
 .vault_pass
 vault_password.txt
 
-config.yml
+hosts.yml
+
+*.pyc
+__pycache__/
