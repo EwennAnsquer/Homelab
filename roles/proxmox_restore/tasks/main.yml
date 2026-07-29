@@ -5,13 +5,10 @@
 - name: "Proxmox : Lister les sauvegardes disponibles pour chaque CT"
   ansible.builtin.command: "pvesm list {{ proxmox.storage_pbs }} --vmid {{ item.vm_id }}"
   register: pbs_backups_list
-  delegate_to: "{{ proxmox.ip }}"
+  delegate_to: "proxmox-dell-optiplex"
   loop: "{{ containers }}"
   failed_when: false
   changed_when: false
-  vars:
-    ansible_user: "{{ ansible.ansible_user }}"
-    ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
 
 # 2. ACTION : RESTAURER CHAQUE CONTENEUR S'IL Y A UNE BACKUP DISPONIBLE
 - name: "Proxmox : Restaurer la version la plus récente pour chaque CT"
@@ -20,66 +17,9 @@
     {{ (item.stdout_lines | reverse | select('search', 'ct/' ~ item.item.vm_id) | first | default(' ')).split()[0] }} 
     --force 1 
     --storage local-lvm
-  delegate_to: "{{ proxmox.ip }}"
+  delegate_to: "proxmox-dell-optiplex"
   loop: "{{ pbs_backups_list.results }}"
   # On n'exécute la restauration que si une ligne de backup valide a été trouvée pour ce conteneur
   when: 
     - item.stdout_lines is defined 
     - item.stdout_lines | select('search', 'ct/' ~ item.item.vm_id) | list | length > 0
-  vars:
-    ansible_user: "{{ ansible.ansible_user }}"
-    ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
-
-# 3. ACTION : DÉMARRER TOUS LES CONTENEURS
-- name: "Proxmox : Démarrer tous les conteneurs"
-  ansible.builtin.command: "pct start {{ item.vm_id }}"
-  delegate_to: "{{ proxmox.ip }}"
-  loop: "{{ containers }}"
-  vars:
-    ansible_user: "{{ ansible.ansible_user }}"
-    ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
-
-- name: "Ansible : Injecter les conteneurs du config.yml dans l'inventaire actif"
-  ansible.builtin.add_host:
-    name: "{{ item.hostname }}"
-    # On extrait l'IP propre (sans le masque /24)
-    ansible_host: "{{ item.address | split('/') | first }}"
-    ansible_user: "{{ ansible.ansible_user }}"
-    ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
-    # On l'ajoute au groupe magique 'all' pour que le Bloc 2 ('hosts: all') le cible
-    groups:
-      - all
-    ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
-  loop: "{{ containers }}"
-  # On n'ajoute que les conteneurs qui ont une adresse IP statique définie
-  when: "item.address is defined and 'dhcp' not in item.address"
-
-# 4. ACTION : ATTENDRE QUE PROXMOX CONFIRME LE STATUT RUNNING
-- name: "Proxmox : Attendre que le conteneur soit marqué en 'running' par l'hyperviseur"
-  ansible.builtin.command: "pct status {{ item.vm_id }}"
-  register: lxc_status
-  # On boucle jusqu'à ce que la commande renvoie "status: running"
-  until: "'status: running' in lxc_status.stdout"
-  retries: 10         # On essaie 10 fois maximum
-  delay: 2            # On attend 2 secondes entre chaque essai (total de 20 secondes max)
-  delegate_to: "{{ proxmox.ip }}" # On interroge directement Proxmox en root
-  loop: "{{ containers }}"
-  vars:
-    ansible_user: "{{ ansible.ansible_user }}"
-    ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
-
-# 5. ACTION : ATTENDRE QUE LE PORT SSH SOIT DISPONIBLE
-- name: "Ansible : Attendre que le SSH (port 22) soit prêt sur les conteneurs"
-  ansible.builtin.wait_for:
-    host: "{{ item.address | split('/') | first }}"
-    port: 22
-    state: started
-    delay: 3         # Attend 3 secondes avant de commencer à tester
-    timeout: 60      # Abandonne et lève une erreur si le conteneur ne répond pas après 60 secondes
-  delegate_to: localhost # Très important : on teste le port depuis ta machine Ansible, pas depuis le conteneur lui-même !
-  loop: "{{ containers }}"
-  when: "item.address is defined and 'dhcp' not in item.address"
-
-- name: "Ansible : Pause de sécurité pour l'initialisation de l'OS"
-  ansible.builtin.pause:
-    seconds: 5
