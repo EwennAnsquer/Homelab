@@ -6,7 +6,7 @@
     current_container_fqdn: >-
       {{ (containers | selectattr('hostname', 'equalto', inventory_hostname) | map(attribute='hostname') | first | default(inventory_hostname)) }}.home
 
-- name: "[victoria-metrics] Initialiser un prometheus.yaml minimal s'il n'existe pas"
+- name: "[victoria-metrics] Initialiser le prometheus.yaml"
   ansible.builtin.copy:
     dest: "{{ target_path }}/prometheus.yaml"
     content: |
@@ -16,9 +16,13 @@
       scrape_configs:
         - job_name: 'node-exporter-lxc'
           static_configs:
-            - targets: ['{{ current_container_fqdn }}:9100']
+            - targets:
+      {% for item in containers %}
+                - '{{ (item.address.split('/'))[0] }}:9100'
+      {% endfor %}
 
         - job_name: 'cadvisor'
+          max_scrape_size: 64MB
           static_configs:
             - targets: ['cadvisor:8080']
     force: true
