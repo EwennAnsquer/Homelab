@@ -25,5 +25,9 @@
           max_scrape_size: 64MB
           static_configs:
             - targets: ['cadvisor:8080']
+
+        - job_name: 'traefik'
+          static_configs:
+            - targets: ['traefik:8080']
     force: true
     mode: '0644'
