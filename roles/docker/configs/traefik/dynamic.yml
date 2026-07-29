@@ -1,0 +1,15 @@
+http:
+  routers:
+    dns-primary:
+      rule: "Host(`dns-primary.azby.fr`)"
+      entryPoints:
+        - "websecure"
+      service: "dns-primary-service"
+      tls:
+        certResolver: "ovh"
+
+  services:
+    dns-primary-service:
+      loadBalancer:
+        servers:
+          - url: "http://192.168.1.105:5380"
