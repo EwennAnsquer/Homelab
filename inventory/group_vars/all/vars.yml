@@ -28,3 +28,18 @@ containers:
     keyctl: true
     network_interface_name: "eth0"
     network_interface_bridge: "vmbr0"
+
+virtual_machines:
+  - vm_id: 4200
+    hostname: "home-assistant"
+    bios: "ovmf"
+    operating_system: "l26"
+    cores: 2
+    memory: 4096
+    disk_size: 32
+    url: "https://github.com/home-assistant/operating-system/releases/download/18.1/haos_ova-18.1.qcow2.xz"
+    filename: "haos_ova-18.1.img"
+    tags: ["haos", "terraform"]
+    mac_address: "52:54:00:00:42:00"
+    network_interface_model: "virtio"
+    network_interface_bridge: "vmbr0"
