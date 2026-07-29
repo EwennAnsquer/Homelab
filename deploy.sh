@@ -2,7 +2,7 @@
 
 set -e
 
-HOSTS_FILE="hosts.yml"
+HOSTS_FILE="inventory/production.yml"
 
 # ==============================================================================
 # Installation des dépendances si absentes
