@@ -6,22 +6,18 @@
     current_ct: "{{ containers | selectattr('hostname', 'equalto', ansible_facts['hostname']) | first }}"
 
 - name: Bloc de préparation Proxmox (tun device)
-  vars:
-    ansible_host: "{{ proxmox.ip }}"
-    ansible_user: "{{ ansible.ansible_user }}"
-    ansible_ssh_private_key_file: "{{ ansible.ansible_ssh_private_key_file }}"
   block:
     - name: "Proxmox : trouver l'ID du LXC ciblé"
       ansible.builtin.command:
         cmd: "pct list"
-      delegate_to: "{{ proxmox.ip }}"
+      delegate_to: "proxmox-dell-optiplex"
       register: pct_list_result
       changed_when: false
 
     - name: "Proxmox : vérifier que lxc.mount.entry tun n'existe pas déjà"
       ansible.builtin.command:
         cmd: "grep -c 'dev/net/tun' /etc/pve/lxc/{{ current_ct.vm_id }}.conf"
-      delegate_to: "{{ proxmox.ip }}"
+      delegate_to: "proxmox-dell-optiplex"
       register: tun_already_present
       failed_when: false
       changed_when: false
@@ -33,13 +29,13 @@
         block: |
           lxc.cgroup2.devices.allow: c 10:200 rwm
           lxc.mount.entry: /dev/net/tun dev/net/tun none bind,create=file
-      delegate_to: "{{ proxmox.ip }}"
+      delegate_to: "proxmox-dell-optiplex"
       register: lxc_conf_updated
 
     - name: "Proxmox : redémarrer le LXC si la config a changé"
       ansible.builtin.command:
         cmd: "pct reboot {{ current_ct.vm_id }}"
-      delegate_to: "{{ proxmox.ip }}"
+      delegate_to: "proxmox-dell-optiplex"
       when: lxc_conf_updated.changed
 
 - name: "Attendre que le LXC soit de nouveau joignable en SSH"
