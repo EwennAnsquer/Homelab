@@ -1,6 +1,10 @@
 ---
 # tasks file for roles/common
 
+- name: "Ansible : Pause de sécurité pour l'initialisation de l'OS"
+  ansible.builtin.pause:
+    seconds: 5
+
 # 1. INITIALISATION DES VARIABLES GLOBALES
 - name: "Système : Récupérer la configuration du conteneur courant"
   ansible.builtin.set_fact:
@@ -18,9 +22,7 @@
       ansible.builtin.command: "pct config {{ current_ct.vm_id }}"
       register: lxc_config
       changed_when: false
-      delegate_to: "{{ proxmox.ip }}"
-      vars:
-        ansible_user: "{{ ansible.ansible_user }}"
+      delegate_to: "proxmox-dell-optiplex"
 
     - name: "Proxmox : Activer keyctl sur le conteneur LXC"
       ansible.builtin.command: "pct set {{ current_ct.vm_id }} --features nesting=1,keyctl=1"
@@ -28,9 +30,7 @@
       # On ne lance la commande que si 'keyctl=1' n'est pas déjà présent dans la configuration du LXC
       when: "'keyctl=1' not in lxc_config.stdout"
       notify: "Redémarrer le conteneur LXC"
-      delegate_to: "{{ proxmox.ip }}"
-      vars:
-        ansible_user: "{{ ansible.ansible_user }}"
+      delegate_to: "proxmox-dell-optiplex"
 
   # Ce bloc entier ne s'exécute QUE si keyctl est défini à true dans ton config.yml
   when: "current_ct.keyctl is defined and current_ct.keyctl | bool"
