@@ -10,6 +10,7 @@
       - gnupg
       - lsb-release
       - fuse-overlayfs
+      - cron
     state: present
     update_cache: yes
 
@@ -54,12 +55,17 @@
     state: started
     enabled: yes
 
-- name: Configurer le daemon Docker pour optimiser le stockage dans LXC
+- name: Configurer le daemon Docker (Optimisation stockage + Limitation des logs)
   copy:
     dest: /etc/docker/daemon.json
     content: |
       {
-        "storage-driver": "overlay2"
+        "storage-driver": "overlay2",
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "10m",
+          "max-file": "3"
+        }
       }
     mode: '0644'
   register: docker_config
@@ -69,6 +75,12 @@
     name: docker
     state: restarted
   when: docker_config.changed
+
+- name: Ajouter un cron pour nettoyer automatiquement les images et caches Docker inutilisés
+  ansible.builtin.cron:
+    name: "Nettoyage automatique Docker (prune)"
+    special_time: weekly
+    job: "docker system prune -af > /dev/null 2>&1"
 
 - name: Création du réseau Docker "proxy_network"
   community.docker.docker_network:

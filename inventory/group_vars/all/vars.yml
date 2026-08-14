@@ -17,7 +17,7 @@ containers:
     type: "debian"
     cores: 8
     memory: 4096
-    disk_size: 40
+    disk_size: 50
     template: "local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst"
     tags: ["debian", "ansible", "terraform"]
     address: "192.168.1.220/24"
