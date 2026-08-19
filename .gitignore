@@ -15,7 +15,7 @@ secrets.tfvars
 # terraform.tfvars.json
 
 # Talos & Kubernetes
-/talos-config/
+talos-config/
 kubeconfig
 *.yaml.patch
 
