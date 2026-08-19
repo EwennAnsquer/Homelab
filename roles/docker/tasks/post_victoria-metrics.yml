@@ -1,7 +1,0 @@
----
-# tasks/post_victoria-metrics.yml
-
-- name: "Redémarrer victoria metrics"
-  community.docker.docker_compose_v2:
-    project_src: /opt/stacks/victoria-metrics
-    state: restarted

@@ -1,9 +1,0 @@
----
-# tasks/pre_docker-socket-proxy.yml
-
-- name: Création du réseau Docker "socket_proxy"
-  community.docker.docker_network:
-    name: socket_proxy
-    driver: bridge
-    state: present
-    internal: true
