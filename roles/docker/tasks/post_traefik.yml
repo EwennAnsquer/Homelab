@@ -1,7 +1,0 @@
----
-# tasks/post_traefik.yml
-
-- name: "Redémarrer traefik"
-  community.docker.docker_compose_v2:
-    project_src: /opt/stacks/traefik
-    state: restarted
