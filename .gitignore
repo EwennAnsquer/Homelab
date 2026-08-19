@@ -1,23 +1,25 @@
-# Terraform
+# --- Terraform ---
 .terraform/
 *.tfstate
 *.tfstate.backup
 terraform.tfstate*
-# Lock file: keep it under version control (do NOT ignore .terraform.lock.hcl)
-# .terraform.lock.hcl
 
-# Terraform local CLI/credentials
+# Terraform CLI & credentials
 .terraformrc
 terraform.rc
 .terraform.d/
 
-# Sensitive local files and overrides (uncomment if you use them)
-# *.tfvars
-# *.tfvars.json
-# override.tf
-# override.tf.json
+# Variables sensibles Terraform
+secrets.tfvars
+# Décommente la ligne suivante si terraform.tfvars.json contient des mots de passe Proxmox :
+# terraform.tfvars.json
 
-# Common secrets / env
+# Talos & Kubernetes
+talos-config/
+kubeconfig
+*.yaml.patch
+
+# --- Keys & Secrets ---
 *.key
 *.pem
 *.crt
@@ -25,29 +27,18 @@ terraform.rc
 *.secret
 *.ini
 
-# Editor / OS files
-.vscode/
-.DS_Store
-.idea/
-*.swp
-
-# Fichiers de retry (générés automatiquement par Ansible en cas d'échec d'un playbook)
+# --- Ansible ---
 *.retry
-
-# Rôles et collections externes téléchargés depuis Ansible Galaxy
-# (Optionnel : décommente si tu utilises un fichier requirements.yml pour télécharger des rôles tiers)
-# roles/externals/
 collections/
-
-# Fichiers de logs locaux
 ansible.log
-
-# Fichiers contenant des secrets chiffrés avec Ansible Vault (Optionnel)
-# Si tu crées un fichier de mot de passe en clair pour Vault, ne le push JAMAIS
 .vault_pass
 vault_password.txt
-
 hosts.yml
 
+# --- System & Editors ---
+.vscode/
+.idea/
+.DS_Store
+*.swp
 *.pyc
 __pycache__/

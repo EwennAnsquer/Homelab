@@ -1,0 +1,102 @@
+---
+# tasks/traefik.yml
+
+- name: "Traefik : Installer les dépendances Python pour le module Docker Compose"
+  ansible.builtin.apt:
+    name:
+      - python3-docker
+    state: present
+
+- name: "Traefik : Créer les dossiers nécessaires (stack + letsencrypt)"
+  ansible.builtin.file:
+    path: "{{ traefik_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - /opt/stacks/traefik
+    - /opt/stacks/traefik/letsencrypt
+    - /opt/stacks/traefik/traefik-manager
+    - /opt/stacks/traefik/traefik-manager/config
+    - /opt/stacks/traefik/traefik-manager/backups
+  loop_control:
+    loop_var: traefik_dir
+
+- name: "Traefik : Créer le fichier acme.json s'il n'existe pas"
+  ansible.builtin.file:
+    path: /opt/stacks/traefik/letsencrypt/acme.json
+    state: touch
+    owner: root
+    group: root
+    mode: '0600'   # OBLIGATOIRE : Traefik refuse de démarrer sinon
+    modification_time: preserve
+    access_time: preserve
+
+- name: "Traefik : Créer le fichier dynamic.yml s'il n'existe pas"
+  ansible.builtin.file:
+    path: /opt/stacks/traefik/dynamic.yml
+    state: touch
+    owner: root
+    group: root
+    mode: '0644'
+    modification_time: preserve
+    access_time: preserve
+
+- name: "Traefik : Lire et parser le fichier .env"
+  ansible.builtin.set_fact:
+    traefik_env: "{{ dict(lookup('file', role_path ~ '/configs/traefik/.env').splitlines()
+      | select('match', '^[A-Za-z_][A-Za-z0-9_]*=')
+      | map('regex_replace', '^([^=]+)=(.*)$', '\\1,\\2')
+      | map('split', ',', 1)) }}"
+
+- name: "Traefik : Créer le fichier traefik.yml avec son contenu"
+  ansible.builtin.copy:
+    dest: /opt/stacks/traefik/traefik.yml
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      log:
+        level: INFO
+
+      api:
+        dashboard: true
+        insecure: false
+
+      metrics:
+        prometheus:
+          addEntryPointsLabels: true
+          addRoutersLabels: true
+          addServicesLabels: true
+
+      entryPoints:
+        web:
+          address: ":80"
+          http:
+            redirections:
+              entryPoint:
+                to: websecure
+                scheme: https
+        websecure:
+          address: ":443"
+
+      providers:
+        docker:
+          exposedByDefault: false
+          network: proxy_network
+        file:
+          filename: /etc/traefik/dynamic.yml
+          watch: true
+
+      certificatesResolvers:
+        ovh:
+          acme:
+            email: "{{ traefik_env.ACME_EMAIL }}"
+            storage: "/letsencrypt/acme.json"
+            dnsChallenge:
+              provider: ovh
+              delayBeforeCheck: 30
+              resolvers:
+                - "1.1.1.1:53"
+                - "8.8.8.8:53"
