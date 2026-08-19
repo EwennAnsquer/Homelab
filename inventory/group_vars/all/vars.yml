@@ -1,0 +1,45 @@
+# group_vars/all.yml
+
+proxmox:
+  ip: "192.168.1.200"
+  endpoint: "https://192.168.1.200:8006/"
+  node_name: "dell-optiplex-3000-micro"
+  api_token: "{{ vault_proxmox_api_token }}"
+  storage_pbs: "pbs-backup"
+
+tailscale:
+  authkey: "{{ vault_tailscale_authkey }}"
+  subnet_routes: "192.168.1.0/24"
+
+containers:
+  - vm_id: 220
+    hostname: "docker"
+    type: "debian"
+    cores: 8
+    memory: 4096
+    disk_size: 50
+    template: "local:vztmpl/debian-13-standard_13.6-1_amd64.tar.zst"
+    tags: ["debian", "ansible", "terraform"]
+    address: "192.168.1.220/24"
+    gateway: "192.168.1.1"
+    keys: ["ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILoOMCJMoxOqd2ZJ0Yux1+qXa9sDg4oJPmhojF90a/lV ansible"]
+    datastore_id: "local-lvm"
+    nesting: true
+    keyctl: true
+    network_interface_name: "eth0"
+    network_interface_bridge: "vmbr0"
+
+virtual_machines:
+  - vm_id: 4200
+    hostname: "home-assistant"
+    bios: "ovmf"
+    operating_system: "l26"
+    cores: 2
+    memory: 4096
+    disk_size: 32
+    url: "https://github.com/home-assistant/operating-system/releases/download/18.1/haos_ova-18.1.qcow2.xz"
+    filename: "haos_ova-18.1.img"
+    tags: ["haos", "terraform"]
+    mac_address: "52:54:00:00:42:00"
+    network_interface_model: "virtio"
+    network_interface_bridge: "vmbr0"

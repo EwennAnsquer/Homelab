@@ -1,0 +1,79 @@
+---
+# tasks/post_dockhand.yml
+
+- name: "[dockhand 1/7] Attendre que l'API réponde"
+  ansible.builtin.uri:
+    url: "https://dockhand.azby.fr/api/environments"
+    method: GET
+    status_code: [200, 401, 403]
+  register: dockhand_health
+  until: dockhand_health.status in [200, 401, 403]
+  retries: 30
+  delay: 5
+
+- name: "[dockhand 2/7] Lister les environnements existants"
+  ansible.builtin.uri:
+    url: "https://dockhand.azby.fr/api/environments"
+    method: GET
+    headers:
+      Content-Type: "application/json"
+    status_code: [200]
+  register: existing_envs
+
+- name: "[dockhand 3/7] Extraire l'ID de l'environnement"
+  ansible.builtin.set_fact:
+    dockhand_env_id: "{{ (existing_envs.json | selectattr('name', 'equalto', 'docker') | map(attribute='id') | first) | default(none) }}"
+
+- name: "[dockhand 4/7] Créer l'environnement si absent"
+  ansible.builtin.uri:
+    url: "https://dockhand.azby.fr/api/environments"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      name: "docker"
+      host: "docker-socket-proxy"
+      connectionType: "direct"
+      port: 2375
+      protocol: "http"
+      publicIp: "docker-socket-proxy"
+    status_code: [200, 201]
+  register: created_env
+  when: dockhand_env_id is none
+
+- name: "[dockhand 5/7] Mettre à jour l'ID si fraîchement créé"
+  ansible.builtin.set_fact:
+    dockhand_env_id: "{{ created_env.json.id }}"
+  when: dockhand_env_id is none and created_env is defined and created_env.json is defined
+
+- name: "[dockhand 6/7] Configurer le check de mises à jour"
+  ansible.builtin.uri:
+    url: "https://dockhand.azby.fr/api/environments/{{ dockhand_env_id }}/update-check"
+    method: POST
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      enabled: "true"
+      autoUpdate: "false"
+      cron: "0 4 * * *"
+      vulnerabilityCriteria: "more_than_current"
+    status_code: [200, 201]
+
+- name: "[dockhand 7/7] Configurer les options globales d'environnement"
+  ansible.builtin.uri:
+    url: "https://dockhand.azby.fr/api/environments/{{ dockhand_env_id }}"
+    method: PUT
+    headers:
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      timezone: "Europe/Paris"
+      collectActivity: true
+      collectMetrics: true
+      highlightChanges: true
+      diskSpaceWarnings: true
+      diskSpaceThresholdType: "percentage"
+      diskSpaceThreshold: 80
+    status_code: [200, 204]

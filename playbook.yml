@@ -1,0 +1,84 @@
+---
+# ==============================================================================
+# BLOC 0 : Démarrage & Préparation Proxmox (S'exécute sur Proxmox)
+# ==============================================================================
+- name: "Proxmox : Démarrer et préparer les conteneurs"
+  hosts: proxmox-dell-optiplex # <-- Uniquement sur l'hyperviseur
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: "Proxmox : Démarrer tous les conteneurs"
+      ansible.builtin.command: "pct start {{ item.vm_id }}"
+      loop: "{{ containers }}"
+      failed_when: false # Ne plante pas si le LXC tourne déjà
+
+    - name: "Ansible : Injecter les conteneurs dans l'inventaire actif"
+      ansible.builtin.add_host:
+        name: "{{ item.hostname }}"
+        groups:
+          - docker_hosts
+        ansible_host: "{{ item.address | split('/') | first }}"
+        ansible_user: root
+        ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+      loop: "{{ containers }}"
+      when: "item.address is defined and 'dhcp' not in item.address"
+
+# ==============================================================================
+# BLOC 0.5 : Attente de la disponibilité SSH depuis Localhost
+# ==============================================================================
+- name: "Ansible : Attendre que le SSH soit disponible sur les conteneurs"
+  hosts: localhost
+  gather_facts: false
+  vars_files:
+    - vars.yml
+  tasks:
+    - name: "Attente du port 22 sur chaque conteneur"
+      ansible.builtin.wait_for:
+        host: "{{ item.address | split('/') | first }}"
+        port: 22
+        state: started
+        delay: 2
+        timeout: 60
+      loop: "{{ containers }}"
+
+# ==============================================================================
+# BLOC 1 : Configuration de Base du Système (Tous les LXC)
+# ==============================================================================
+- name: "Configuration de base des conteneurs"
+  hosts: all:!proxmox-dell-optiplex
+  gather_facts: true
+  vars_files:
+    - vars.yml
+  roles:
+    - role: common
+
+# ==============================================================================
+# BLOC 2 : Installer le moteur Docker
+# ==============================================================================
+- name: Déployer Docker sur le conteneur LXC
+  hosts: docker_hosts
+  become: true
+  roles:
+    - docker
+
+# ==============================================================================
+# BLOC 3 : Restauration des données (Uniquement si demandé)
+# ==============================================================================
+- name: "Vérification et Restauration Proxmox"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "Restauration des LXC"
+      ansible.builtin.include_role:
+        name: proxmox_restore
+      when: restore_docker | default(false) | bool
+
+# ==============================================================================
+# BLOC 4 : Déployer Tailscale
+# ==============================================================================
+- name: Déployer Tailscale
+  hosts: docker_hosts
+  become: true
+  roles:
+    - tailscale

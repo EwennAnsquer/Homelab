@@ -1,0 +1,25 @@
+---
+# tasks file for roles/proxmox_restore
+
+# 1. ON RÉCUPÈRE LA LISTE BRUTE DES SAUVEGARDES DEPUIS PROXMOX
+- name: "Proxmox : Lister les sauvegardes disponibles pour chaque CT"
+  ansible.builtin.command: "pvesm list {{ proxmox.storage_pbs }} --vmid {{ item.vm_id }}"
+  register: pbs_backups_list
+  delegate_to: "proxmox-dell-optiplex"
+  loop: "{{ containers }}"
+  failed_when: false
+  changed_when: false
+
+# 2. ACTION : RESTAURER CHAQUE CONTENEUR S'IL Y A UNE BACKUP DISPONIBLE
+- name: "Proxmox : Restaurer la version la plus récente pour chaque CT"
+  ansible.builtin.command: >
+    pct restore {{ item.item.vm_id }} 
+    {{ (item.stdout_lines | reverse | select('search', 'ct/' ~ item.item.vm_id) | first | default(' ')).split()[0] }} 
+    --force 1 
+    --storage local-lvm
+  delegate_to: "proxmox-dell-optiplex"
+  loop: "{{ pbs_backups_list.results }}"
+  # On n'exécute la restauration que si une ligne de backup valide a été trouvée pour ce conteneur
+  when: 
+    - item.stdout_lines is defined 
+    - item.stdout_lines | select('search', 'ct/' ~ item.item.vm_id) | list | length > 0

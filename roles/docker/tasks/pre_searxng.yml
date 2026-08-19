@@ -1,0 +1,8 @@
+---
+# tasks/pre_searxng.yml
+
+- name: "[{{ service_name }}] Créer le répertoire 'core-config' sur le serveur"
+  ansible.builtin.file:
+    path: "{{ target_path }}/core-config/"
+    state: directory
+    mode: '0755'

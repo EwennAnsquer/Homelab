@@ -1,0 +1,29 @@
+services:
+  homebox:
+    image: ghcr.io/sysadminsmedia/homebox:latest
+    restart: always
+    environment:
+      - HBOX_LOG_LEVEL=info
+      - HBOX_LOG_FORMAT=text
+      - HBOX_WEB_MAX_UPLOAD_SIZE=10
+      # Please consider allowing analytics to help us improve Homebox (basic computer information, no personal data)
+      - HBOX_OPTIONS_ALLOW_ANALYTICS=false
+      # Use a strong random string for the pepper in production, it will be used to hash API keys and make them more secure
+      - HBOX_AUTH_API_KEY_PEPPER=dkCljDjS1Dm86HgWXuVMkmsXSkBeKwMzdGIIorhaH188FsOtyIGejlMHxd0RX/pn
+    volumes:
+      - ./homebox-data:/data/
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.homebox.rule=Host(`homebox.azby.fr`)
+      - traefik.http.routers.homebox.entrypoints=websecure
+      - traefik.http.routers.homebox.tls=true
+      - traefik.http.routers.homebox.tls.certresolver=ovh
+      - traefik.http.services.homebox.loadbalancer.server.port=7745
+    networks:
+      - proxy_network
+volumes:
+  homebox-data:
+    driver: local
+networks:
+  proxy_network:
+    external: true
