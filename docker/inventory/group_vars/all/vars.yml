@@ -35,7 +35,7 @@ virtual_machines:
     bios: "ovmf"
     operating_system: "l26"
     cores: 2
-    memory: 4096
+    memory: 6096
     disk_size: 32
     url: "https://github.com/home-assistant/operating-system/releases/download/18.1/haos_ova-18.1.qcow2.xz"
     filename: "haos_ova-18.1.img"

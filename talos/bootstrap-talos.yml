@@ -1,0 +1,123 @@
+---
+- name: Deployment et Bootstrap du cluster Talos
+  hosts: localhost
+  connection: local
+  vars:
+    tfvars: "{{ lookup('file', 'terraform.tfvars.json') | from_json }}"
+    
+    cluster_name: "{{ tfvars.cluster_name | default('talos-cluster') }}"
+    control_plane_ip: "{{ tfvars.nodes['control-plane-1'].ip }}"
+    cluster_endpoint: "https://{{ tfvars.nodes['control-plane-1'].ip }}:6443"
+    config_dir: "./talos-config"
+
+  tasks:
+    - name: Créer le dossier de configuration
+      file:
+        path: "{{ config_dir }}"
+        state: directory
+        mode: '0700'
+
+    - name: Générer le bundle de secrets Talos
+      command: >
+        talosctl gen secrets -o {{ config_dir }}/secrets.yaml
+      args:
+        creates: "{{ config_dir }}/secrets.yaml"
+
+    - name: Générer la configuration du cluster avec les secrets
+      command: >
+        talosctl gen config {{ cluster_name }} {{ cluster_endpoint }}
+        --output-dir {{ config_dir }}
+        --with-secrets {{ config_dir }}/secrets.yaml
+      args:
+        creates: "{{ config_dir }}/controlplane.yaml"
+
+    - name: Appliquer la configuration sur le Control Plane (mTLS)
+      command: >
+        talosctl apply-config
+        --nodes {{ control_plane_ip }}
+        --endpoints {{ control_plane_ip }}
+        --file {{ config_dir }}/controlplane.yaml
+        --talosconfig {{ config_dir }}/talosconfig
+      register: cp_apply
+      failed_when: false
+
+    - name: Appliquer la configuration sur le Control Plane (Fallback Insecure)
+      command: >
+        talosctl apply-config --insecure
+        --nodes {{ control_plane_ip }}
+        --file {{ config_dir }}/controlplane.yaml
+      when: cp_apply.rc != 0
+
+    - name: Appliquer la configuration sur les Workers (mTLS)
+      command: >
+        talosctl apply-config
+        --nodes {{ item.value.ip }}
+        --endpoints {{ control_plane_ip }}
+        --file {{ config_dir }}/worker.yaml
+        --config-patch '{"machine":{"nodeLabels":{"node-role.kubernetes.io/worker":""}}}'
+        --talosconfig {{ config_dir }}/talosconfig
+      loop: "{{ tfvars.nodes | dict2items }}"
+      when: "'worker' in item.value.role"
+      register: worker_apply
+      failed_when: false
+
+    - name: Appliquer la configuration sur les Workers (Fallback Insecure)
+      command: >
+        talosctl apply-config --insecure
+        --nodes {{ item.item.value.ip }}
+        --file {{ config_dir }}/worker.yaml
+        --config-patch '{"machine":{"nodeLabels":{"node-role.kubernetes.io/worker":""}}}'
+      loop: "{{ worker_apply.results }}"
+      when: 
+        - item.skipped is not defined
+        - item.rc is defined and item.rc != 0
+
+    - name: Attendre que le Control Plane réponde sur l'API Talos
+      wait_for:
+        host: "{{ control_plane_ip }}"
+        port: 50000
+        timeout: 60
+
+    - name: Bootstrapper le cluster Kubernetes
+      command: >
+        talosctl bootstrap
+        --nodes {{ control_plane_ip }}
+        --endpoints {{ control_plane_ip }}
+        --talosconfig {{ config_dir }}/talosconfig
+      register: bootstrap_res
+      failed_when: 
+        - bootstrap_res.rc != 0
+        - "'AlreadyExists' not in bootstrap_res.stderr"
+
+    - name: Générer le fichier Kubeconfig
+      command: >
+        talosctl kubeconfig ./kubeconfig
+        --nodes {{ control_plane_ip }}
+        --endpoints {{ control_plane_ip }}
+        --talosconfig {{ config_dir }}/talosconfig
+        --force
+
+    - name: Attendre que l'API Server Kubernetes soit accessible (port 6443)
+      wait_for:
+        host: "{{ control_plane_ip }}"
+        port: 6443
+        timeout: 120
+
+    - name: Attendre que le cluster Kubernetes réponde aux requêtes
+      command: kubectl --kubeconfig ./kubeconfig get nodes
+      register: kube_check
+      until: kube_check.rc == 0
+      retries: 24
+      delay: 5
+
+    - name: Appliquer les labels de rôles Kubernetes sur les Workers
+      command: >
+        kubectl --kubeconfig ./kubeconfig label node {{ item.key }}
+        node-role.kubernetes.io/{{ item.value.role }}=""
+        --overwrite
+      loop: "{{ tfvars.nodes | dict2items }}"
+      when: "'worker' in item.value.role"
+      register: label_res
+      until: label_res.rc == 0
+      retries: 30
+      delay: 5
