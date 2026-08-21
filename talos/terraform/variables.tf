@@ -4,6 +4,12 @@ variable "proxmox_endpoint" {
   description = "L'adresse API de votre serveur Proxmox (ex: https://192.168.1.100:8006/)"
 }
 
+variable "proxmox_ip" {
+  type        = string
+  description = "L'adresse IP de votre serveur Proxmox (ex: 192.168.1.10)"
+}
+
+
 variable "proxmox_api_token" {
   type        = string
   sensitive   = true
@@ -13,11 +19,6 @@ variable "proxmox_api_token" {
 variable "proxmox_node_name" {
   type        = string
   description = "Le nom de votre nœud Proxmox hyperviseur"
-}
-
-variable "image_name" {
-  type        = string
-  description = "Le nom de l'image dans le volume 'local'"
 }
 
 variable "gateway" {

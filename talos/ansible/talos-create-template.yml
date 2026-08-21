@@ -1,0 +1,108 @@
+---
+# Phase 1 : Récupération des infos en local et demande de l'URL
+- name: Préparation des variables et de la cible
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_prompt:
+    - name: talos_image_url
+      prompt: "Entrez l'URL de l'image disque (.raw.xz) issue de factory.talos.dev"
+      private: false
+
+  vars:
+    tfvars_file: "./terraform/terraform.tfvars.json"
+    ssh_private_key: "~/.ssh/ansible"
+
+  tasks:
+    - name: Charger les variables depuis terraform.tfvars.json
+      ansible.builtin.include_vars:
+        file: "{{ tfvars_file }}"
+        name: tfvars
+
+    - name: Configurer l'IP Proxmox cible
+      ansible.builtin.set_fact:
+        proxmox_host: "{{ tfvars.proxmox_ip }}"
+
+    - name: Ajouter dynamiquement Proxmox à l'inventaire SSH
+      ansible.builtin.add_host:
+        name: "{{ proxmox_host }}"
+        groups: proxmox_node
+        ansible_user: root
+        ansible_connection: ssh
+        ansible_ssh_private_key_file: "{{ ssh_private_key }}"
+        ansible_ssh_extra_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+        talos_url: "{{ talos_image_url }}"
+
+# Phase 2 : Exécution des commandes directement sur Proxmox via SSH
+- name: Création du template Talos Linux sur Proxmox
+  hosts: proxmox_node
+  gather_facts: false
+
+  vars:
+    template_vmid: 9000
+    template_name: "talos-template"
+    storage_target: "local-lvm"
+    temp_dir: "/tmp"
+
+  environment:
+    PATH: "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+  tasks:
+    - name: Extraire les noms de fichiers
+      ansible.builtin.set_fact:
+        raw_xz_filename: "{{ talos_url | basename }}"
+        raw_filename: "{{ (talos_url | basename) | regex_replace('\\.xz$', '') }}"
+
+    - name: Télécharger l'image Talos .raw.xz
+      ansible.builtin.get_url:
+        url: "{{ talos_url }}"
+        dest: "{{ temp_dir }}/{{ raw_xz_filename }}"
+        mode: '0644'
+
+    - name: Décompresser l'image .raw.xz
+      ansible.builtin.command:
+        cmd: "xz -d {{ temp_dir }}/{{ raw_xz_filename }}"
+        creates: "{{ temp_dir }}/{{ raw_filename }}"
+
+    - name: Vérifier si le template existant doit être supprimé
+      ansible.builtin.command:
+        cmd: "qm status {{ template_vmid }}"
+      register: qm_status
+      failed_when: false
+      changed_when: false
+
+    - name: Supprimer l'ancien template Proxmox (si existant)
+      ansible.builtin.command:
+        cmd: "qm destroy {{ template_vmid }} --destroy-unreferenced-disks 1"
+      when: qm_status.rc == 0
+
+    - name: Créer la VM modèle
+      ansible.builtin.command:
+        cmd: "qm create {{ template_vmid }} --name {{ template_name }} --memory 2048 --cores 2 --net0 virtio,bridge=vmbr0"
+
+    - name: Importer le disque dans le datastore
+      ansible.builtin.command:
+        cmd: "qm importdisk {{ template_vmid }} {{ temp_dir }}/{{ raw_filename }} {{ storage_target }}"
+
+    - name: Configurer le matériel de la VM (Q35, UEFI, Cloud-Init, VirtIO)
+      ansible.builtin.command:
+        cmd: >
+          qm set {{ template_vmid }}
+          --scsihw virtio-scsi-single
+          --scsi0 {{ storage_target }}:vm-{{ template_vmid }}-disk-0,ssd=1,discard=on
+          --efidisk0 {{ storage_target }}:0,format=raw,efitype=4m,pre-enrolled-keys=0
+          --ide2 {{ storage_target }}:cloudinit
+          --boot order=scsi0
+          --agent enabled=1
+          --bios ovmf
+          --machine q35
+
+    - name: Convertir la VM en Template
+      ansible.builtin.command:
+        cmd: "qm template {{ template_vmid }}"
+
+    - name: Nettoyer le fichier temporaire .raw
+      ansible.builtin.file:
+        path: "{{ temp_dir }}/{{ raw_filename }}"
+        state: absent

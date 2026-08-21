@@ -3,21 +3,21 @@
   hosts: localhost
   connection: local
   vars_files:
-    - vars-fluxcd.yml
+    - ./ansible/vars-fluxcd.yml
 
   tasks:
     - name: Vérifier si le CLI Flux est installé localement
-      command: flux --version
+      ansible.builtin.command: flux --version
       register: flux_cli
       ignore_errors: true
       changed_when: false
 
     - name: Installer le CLI Flux s'il est absent
-      shell: curl -s https://fluxcd.io/install.sh | bash
+      ansible.builtin.shell: curl -s https://fluxcd.io/install.sh | bash
       when: flux_cli.rc != 0
 
     - name: Exécuter le bootstrap FluxCD
-      command: >
+      ansible.builtin.command: >
         flux bootstrap {{ git_provider }}
         --owner={{ git_owner }}
         --repository={{ git_repo }}

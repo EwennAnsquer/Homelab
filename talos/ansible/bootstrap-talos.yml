@@ -3,7 +3,7 @@
   hosts: localhost
   connection: local
   vars:
-    tfvars: "{{ lookup('file', 'terraform.tfvars.json') | from_json }}"
+    tfvars: "{{ lookup('file', './terraform/terraform.tfvars.json') | from_json }}"
     
     cluster_name: "{{ tfvars.cluster_name | default('talos-cluster') }}"
     control_plane_ip: "{{ tfvars.nodes['control-plane-1'].ip }}"
@@ -12,19 +12,19 @@
 
   tasks:
     - name: Créer le dossier de configuration
-      file:
+      ansible.builtin.file:
         path: "{{ config_dir }}"
         state: directory
         mode: '0700'
 
     - name: Générer le bundle de secrets Talos
-      command: >
+      ansible.builtin.command: >
         talosctl gen secrets -o {{ config_dir }}/secrets.yaml
       args:
         creates: "{{ config_dir }}/secrets.yaml"
 
     - name: Générer la configuration du cluster avec les secrets
-      command: >
+      ansible.builtin.command: >
         talosctl gen config {{ cluster_name }} {{ cluster_endpoint }}
         --output-dir {{ config_dir }}
         --with-secrets {{ config_dir }}/secrets.yaml
@@ -32,7 +32,7 @@
         creates: "{{ config_dir }}/controlplane.yaml"
 
     - name: Appliquer la configuration sur le Control Plane (mTLS)
-      command: >
+      ansible.builtin.command: >
         talosctl apply-config
         --nodes {{ control_plane_ip }}
         --endpoints {{ control_plane_ip }}
@@ -42,19 +42,19 @@
       failed_when: false
 
     - name: Appliquer la configuration sur le Control Plane (Fallback Insecure)
-      command: >
+      ansible.builtin.command: >
         talosctl apply-config --insecure
         --nodes {{ control_plane_ip }}
         --file {{ config_dir }}/controlplane.yaml
       when: cp_apply.rc != 0
 
     - name: Appliquer la configuration sur les Workers (mTLS)
-      command: >
+      ansible.builtin.command: >
         talosctl apply-config
         --nodes {{ item.value.ip }}
         --endpoints {{ control_plane_ip }}
         --file {{ config_dir }}/worker.yaml
-        --config-patch '{{ lookup("file", "worker-patch.json") }}'
+        --config-patch '{{ lookup("file", "./ansible/worker-patch.json") }}'
         --talosconfig {{ config_dir }}/talosconfig
       loop: "{{ tfvars.nodes | dict2items }}"
       when: "'worker' in item.value.role"
@@ -62,24 +62,24 @@
       failed_when: false
 
     - name: Appliquer la configuration sur les Workers (Fallback Insecure)
-      command: >
+      ansible.builtin.command: >
         talosctl apply-config --insecure
         --nodes {{ item.item.value.ip }}
         --file {{ config_dir }}/worker.yaml
-        --config-patch '{{ lookup("file", "worker-patch.json") }}'
+        --config-patch '{{ lookup("file", "./ansible/worker-patch.json") }}'
       loop: "{{ worker_apply.results }}"
       when: 
         - item.skipped is not defined
         - item.rc is defined and item.rc != 0
 
     - name: Attendre que le Control Plane réponde sur l'API Talos
-      wait_for:
+      ansible.builtin.wait_for:
         host: "{{ control_plane_ip }}"
         port: 50000
         timeout: 60
 
     - name: Bootstrapper le cluster Kubernetes
-      command: >
+      ansible.builtin.command: >
         talosctl bootstrap
         --nodes {{ control_plane_ip }}
         --endpoints {{ control_plane_ip }}
@@ -90,7 +90,7 @@
         - "'AlreadyExists' not in bootstrap_res.stderr"
 
     - name: Générer le fichier Kubeconfig
-      command: >
+      ansible.builtin.command: >
         talosctl kubeconfig ./kubeconfig
         --nodes {{ control_plane_ip }}
         --endpoints {{ control_plane_ip }}
@@ -98,20 +98,20 @@
         --force
 
     - name: Attendre que l'API Server Kubernetes soit accessible (port 6443)
-      wait_for:
+      ansible.builtin.wait_for:
         host: "{{ control_plane_ip }}"
         port: 6443
         timeout: 120
 
     - name: Attendre que le cluster Kubernetes réponde aux requêtes
-      command: kubectl --kubeconfig ./kubeconfig get nodes
+      ansible.builtin.command: kubectl --kubeconfig ./kubeconfig get nodes
       register: kube_check
       until: kube_check.rc == 0
       retries: 24
       delay: 5
 
     - name: Appliquer les labels de rôles Kubernetes sur les Workers
-      command: >
+      ansible.builtin.command: >
         kubectl --kubeconfig ./kubeconfig label node {{ item.key }}
         node-role.kubernetes.io/{{ item.value.role }}=""
         --overwrite
