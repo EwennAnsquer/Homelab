@@ -1,0 +1,5 @@
+git_provider: "github"
+git_owner: "EwennAnsquer"
+git_repo: "Homelab"
+target_path: "talos/charts"
+git_branch: "master"
