@@ -19,9 +19,6 @@
           ]
         }
       ]
-    },
-    "nodeLabels": {
-      "node-role.kubernetes.io/worker": ""
     }
   }
 }
