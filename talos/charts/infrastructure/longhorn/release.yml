@@ -14,10 +14,10 @@ spec:
         kind: HelmRepository
         name: longhorn
         namespace: longhorn
-      install:
-        disableWait: true
-      uninstall:
-        disableWait: true
+  install:
+    disableWait: true
+  uninstall:
+    disableWait: true
   values:
     defaultSettings:
       createDefaultDiskLabeledNodes: true
