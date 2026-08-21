@@ -1,0 +1,27 @@
+{
+  "machine": {
+    "install": {
+      "extensions": [
+        {
+          "image": "ghcr.io/siderolabs/iscsi-tools:v0.1.4"
+        }
+      ]
+    },
+    "kubelet": {
+      "extraMounts": [
+        {
+          "destination": "/var/lib/iscsi",
+          "type": "bind",
+          "source": "/var/lib/iscsi",
+          "options": [
+            "bind",
+            "rshared"
+          ]
+        }
+      ]
+    },
+    "nodeLabels": {
+      "node-role.kubernetes.io/worker": ""
+    }
+  }
+}

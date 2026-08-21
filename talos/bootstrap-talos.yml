@@ -54,7 +54,7 @@
         --nodes {{ item.value.ip }}
         --endpoints {{ control_plane_ip }}
         --file {{ config_dir }}/worker.yaml
-        --config-patch '{"machine":{"nodeLabels":{"node-role.kubernetes.io/worker":""}}}'
+        --config-patch '{{ lookup("file", "worker-patch.json") }}'
         --talosconfig {{ config_dir }}/talosconfig
       loop: "{{ tfvars.nodes | dict2items }}"
       when: "'worker' in item.value.role"
@@ -66,7 +66,7 @@
         talosctl apply-config --insecure
         --nodes {{ item.item.value.ip }}
         --file {{ config_dir }}/worker.yaml
-        --config-patch '{"machine":{"nodeLabels":{"node-role.kubernetes.io/worker":""}}}'
+        --config-patch '{{ lookup("file", "worker-patch.json") }}'
       loop: "{{ worker_apply.results }}"
       when: 
         - item.skipped is not defined
