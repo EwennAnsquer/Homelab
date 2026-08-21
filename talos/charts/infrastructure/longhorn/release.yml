@@ -21,7 +21,8 @@ spec:
   values:
     defaultSettings:
       defaultReplicaCount: 2
-      createDefaultDiskLabeledNodes: true
       systemManagedComponentsNodeSelector: ""
+      defaultDataPath: /var/lib/longhorn
+      createDefaultDiskLabeledNodes: false
     csi:
       kubeletRootDir: /var/lib/kubelet
