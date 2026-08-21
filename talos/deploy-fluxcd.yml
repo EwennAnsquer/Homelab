@@ -25,6 +25,7 @@
         --path={{ target_path }}
         --namespace={{ flux_namespace }}
         --personal
+        --non-interactive
         --kubeconfig=./kubeconfig
       environment:
         GITHUB_TOKEN: "{{ lookup('env', 'GITHUB_TOKEN') }}"
