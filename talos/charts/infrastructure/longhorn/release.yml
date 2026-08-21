@@ -14,12 +14,13 @@ spec:
         kind: HelmRepository
         name: longhorn
         namespace: longhorn
-      install:
-        disableWait: true
-      uninstall:
-        disableWait: true
+  install:
+    disableWait: true
+  uninstall:
+    disableWait: true
   values:
     defaultSettings:
+      defaultReplicaCount: 2
       createDefaultDiskLabeledNodes: true
       systemManagedComponentsNodeSelector: ""
     csi:
