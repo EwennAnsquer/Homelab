@@ -23,6 +23,7 @@
         --repository={{ git_repo }}
         --branch={{ git_branch }}
         --path={{ target_path }}
+        --namespace={{ flux_namespace }}
         --personal
         --kubeconfig=./kubeconfig
       environment:
