@@ -5,6 +5,7 @@ metadata:
   namespace: longhorn
 spec:
   interval: 30m
+  targetNamespace: longhorn
   chart:
     spec:
       chart: longhorn
@@ -16,5 +17,6 @@ spec:
   values:
     defaultSettings:
       createDefaultDiskLabeledNodes: true
+      systemManagedComponentsNodeSelector: ""
     csi:
       kubeletRootDir: /var/lib/kubelet
