@@ -20,6 +20,7 @@ spec:
     disableWait: true
   values:
     defaultSettings:
+      defaultReplicaCount: 2
       createDefaultDiskLabeledNodes: true
       systemManagedComponentsNodeSelector: ""
     csi:
