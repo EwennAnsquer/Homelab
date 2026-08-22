@@ -3,12 +3,13 @@
   hosts: localhost
   connection: local
   vars:
-    tfvars: "{{ lookup('file', './terraform/terraform.tfvars.json') | from_json }}"
+    tfvars: "{{ lookup('file', tfvars_path) | from_json }}"
     
     cluster_name: "{{ tfvars.cluster_name | default('talos-cluster') }}"
     control_plane_ip: "{{ tfvars.nodes['control-plane-1'].ip }}"
     cluster_endpoint: "https://{{ tfvars.nodes['control-plane-1'].ip }}:6443"
     config_dir: "./talos-config"
+    kubeconfig_path: "{{ playbook_dir }}/../kubeconfig"
 
   tasks:
     - name: Créer le dossier de configuration
@@ -54,7 +55,7 @@
         --nodes {{ item.value.ip }}
         --endpoints {{ control_plane_ip }}
         --file {{ config_dir }}/worker.yaml
-        --config-patch '{{ lookup("file", "./ansible/worker-patch.json") }}'
+        --config-patch '{{ lookup("file", playbook_dir + "/worker-patch.json") }}'
         --talosconfig {{ config_dir }}/talosconfig
       loop: "{{ tfvars.nodes | dict2items }}"
       when: "'worker' in item.value.role"
@@ -66,7 +67,7 @@
         talosctl apply-config --insecure
         --nodes {{ item.item.value.ip }}
         --file {{ config_dir }}/worker.yaml
-        --config-patch '{{ lookup("file", "./ansible/worker-patch.json") }}'
+        --config-patch '{{ lookup("file", playbook_dir + "/worker-patch.json") }}'
       loop: "{{ worker_apply.results }}"
       when: 
         - item.skipped is not defined
@@ -91,7 +92,7 @@
 
     - name: Générer le fichier Kubeconfig
       ansible.builtin.command: >
-        talosctl kubeconfig ./kubeconfig
+        talosctl kubeconfig {{ kubeconfig_path }}
         --nodes {{ control_plane_ip }}
         --endpoints {{ control_plane_ip }}
         --talosconfig {{ config_dir }}/talosconfig
@@ -104,7 +105,7 @@
         timeout: 120
 
     - name: Attendre que le cluster Kubernetes réponde aux requêtes
-      ansible.builtin.command: kubectl --kubeconfig ./kubeconfig get nodes
+      ansible.builtin.command: kubectl --kubeconfig {{ kubeconfig_path }} get nodes
       register: kube_check
       until: kube_check.rc == 0
       retries: 24
@@ -112,7 +113,7 @@
 
     - name: Appliquer les labels de rôles Kubernetes sur les Workers
       ansible.builtin.command: >
-        kubectl --kubeconfig ./kubeconfig label node {{ item.key }}
+        kubectl --kubeconfig {{ kubeconfig_path }} label node {{ item.key }}
         node-role.kubernetes.io/{{ item.value.role }}=""
         --overwrite
       loop: "{{ tfvars.nodes | dict2items }}"
