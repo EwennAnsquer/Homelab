@@ -20,9 +20,7 @@ spec:
     disableWait: true
   values:
     defaultSettings:
-      defaultReplicaCount: 2
-      systemManagedComponentsNodeSelector: ""
-      defaultDataPath: /var/lib/longhorn
       createDefaultDiskLabeledNodes: false
+      systemManagedComponentsNodeSelector: ""
     csi:
       kubeletRootDir: /var/lib/kubelet
