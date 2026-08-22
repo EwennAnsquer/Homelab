@@ -2,8 +2,8 @@
 - name: Installer et bootstrapper FluxCD sur le cluster
   hosts: localhost
   connection: local
-  vars_files:
-    - ./ansible/vars-fluxcd.yml
+  vars:
+    kubeconfig_path: "{{ playbook_dir }}/../kubeconfig"
 
   tasks:
     - name: Vérifier si le CLI Flux est installé localement
@@ -18,13 +18,13 @@
 
     - name: Exécuter le bootstrap FluxCD
       ansible.builtin.command: >
-        flux bootstrap {{ git_provider }}
+        flux bootstrap github
         --owner={{ git_owner }}
         --repository={{ git_repo }}
         --branch={{ git_branch }}
         --path={{ target_path }}
         --personal
         --token-auth
-        --kubeconfig=./kubeconfig
+        --kubeconfig={{ kubeconfig_path }}
       environment:
         GITHUB_TOKEN: "{{ lookup('env', 'GITHUB_TOKEN') }}"

@@ -28,6 +28,7 @@ resource "proxmox_virtual_environment_vm" "talos_nodes" {
   efi_disk {
     datastore_id = "local-lvm"
     file_format  = "raw"
+    type         = "4m"
   }
 
   disk {
