@@ -22,5 +22,17 @@ spec:
     defaultSettings:
       createDefaultDiskLabeledNodes: false
       systemManagedComponentsNodeSelector: ""
+      defaultReplicaCount: 2
+      enableTelemetryReporting: false
+      guaranteedEngineManagerCPU: "12"
+      guaranteedReplicaManagerCPU: "12"
+      v2DataEngine: false
+      concurrentAutomaticEngineUpgradePerNodeLimit: 0
     csi:
       kubeletRootDir: /var/lib/kubelet
+    longhornUI:
+      resources:
+        limits:
+          memory: 128Mi
+        requests:
+          memory: 32Mi
