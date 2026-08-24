@@ -20,17 +20,14 @@
 
     - name: Générer le bundle de secrets Talos
       ansible.builtin.command: >
-        talosctl gen secrets -o {{ config_dir }}/secrets.yaml
-      args:
-        creates: "{{ config_dir }}/secrets.yaml"
+        talosctl gen secrets -o {{ config_dir }}/secrets.yaml --force
 
     - name: Générer la configuration du cluster avec les secrets
       ansible.builtin.command: >
         talosctl gen config {{ cluster_name }} {{ cluster_endpoint }}
         --output-dir {{ config_dir }}
         --with-secrets {{ config_dir }}/secrets.yaml
-      args:
-        creates: "{{ config_dir }}/controlplane.yaml"
+        --force
 
     - name: Appliquer la configuration sur le Control Plane (mTLS)
       ansible.builtin.command: >
